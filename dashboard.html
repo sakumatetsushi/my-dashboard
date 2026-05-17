@@ -454,16 +454,22 @@ body.is-mobile .mobile-only { display: block !important; }
 
   /* ----- NOW画面スマホ専用 ----- */
 
-  /* TODAY STATE BARを縦2段に */
+  /* TODAY STATE BAR: 縦幅を最小化 */
   .now-state-bar {
-    flex-direction: column;
-    gap: 8px;
-    padding: 10px 12px;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 6px 10px;
+    align-items: center;
   }
-  .now-state-bar > div,
-  .now-state-bar > label { width: 100%; min-width: unset; }
-  /* 縦仕切りを非表示 */
   .now-state-bar > [style*="width:1px"] { display: none; }
+  /* モードボタンを小さく */
+  .now-mode-btn { padding: 3px 8px !important; font-size: 10px !important; min-height: 28px !important; }
+  /* HEAT/FATIGUE ラベルを非表示 */
+  .now-state-bar .heat-label { display: none; }
+  /* note入力を1行に収める */
+  .now-state-bar > label { min-width: 120px; flex: 1; }
+  /* 記録ボタンをコンパクトに */
+  .now-state-bar .btn { min-height: 28px; padding: 3px 8px; font-size: 10px; }
 
   /* KPI: コンパクト横並び */
   .kpi-row { gap: 5px; }
@@ -612,12 +618,12 @@ body.is-mobile .mobile-only { display: block !important; }
     </div>
     <div style="width:1px;background:var(--border);align-self:stretch;margin:0 4px;"></div>
     <div style="display:flex;flex-direction:column;gap:4px;">
-      <span style="font-size:10px;color:var(--text3);font-weight:700;letter-spacing:.08em;text-transform:uppercase;">HEAT</span>
+      <span class="heat-label" style="font-size:10px;color:var(--text3);font-weight:700;letter-spacing:.08em;text-transform:uppercase;">HEAT</span>
       <div id="now-heat-dots" style="display:flex;gap:3px;align-items:center;"></div>
     </div>
     <div style="width:1px;background:var(--border);align-self:stretch;margin:0 4px;"></div>
     <div style="display:flex;flex-direction:column;gap:4px;">
-      <span style="font-size:10px;color:var(--text3);font-weight:700;letter-spacing:.08em;text-transform:uppercase;">FATIGUE</span>
+      <span class="heat-label" style="font-size:10px;color:var(--text3);font-weight:700;letter-spacing:.08em;text-transform:uppercase;">FATIGUE</span>
       <div id="now-fatigue-dots" style="display:flex;gap:3px;align-items:center;"></div>
     </div>
     <div style="width:1px;background:var(--border);align-self:stretch;margin:0 4px;"></div>
@@ -653,15 +659,12 @@ body.is-mobile .mobile-only { display: block !important; }
   <div class="now-section-title">DOMAIN MOMENTUM — 領域別推進状況</div>
   <div class="domain-heat-row" id="domain-heat-row"></div>
 
-  <!-- ④ 上段：詰まり検出 ＋ 直近タスク -->
+  <!-- ④ 上段：RISKS ＋ 直近タスク -->
   <div class="grid2">
-    <!-- 詰まり検出 -->
     <div class="card">
       <h2 class="r" style="display:flex;justify-content:space-between;align-items:center;">
-        🚨 BLOCKERS &amp; RISKS
-        <div style="display:flex;gap:6px;">
-          <button class="btn btn-p btn-sm" onclick="openRiskAddModal()">＋ リスク</button>
-        </div>
+        🚨 RISKS
+        <button class="btn btn-p btn-sm" onclick="openRiskAddModal()">＋ 追加</button>
       </h2>
       <div id="now-blockers"></div>
     </div>
@@ -693,23 +696,19 @@ body.is-mobile .mobile-only { display: block !important; }
     </div>
   </div>
 
-  <!-- ⑥ 下段：課題 ＋ AIアクション -->
+  <!-- ⑥ 下段：ISSUES ＋ AIアクション -->
   <div class="grid2">
-    <div style="display:flex;flex-direction:column;gap:14px;">
-      <div class="card" style="margin-bottom:0;">
-        <h2 class="r" style="display:flex;justify-content:space-between;align-items:center;">
-          🔧 ISSUES &amp; BLOCKERS
-          <button class="btn btn-p btn-sm" onclick="openIssueModal('process')">＋ 課題</button>
-        </h2>
-        <div id="ov-process-issues"></div>
-      </div>
-      <div class="card" style="margin-bottom:0;">
-        <h2 class="y" style="display:flex;justify-content:space-between;align-items:center;">
-          📌 PROJECT ISSUES
-          <button class="btn btn-p btn-sm" onclick="openIssueModal('project')">＋ 課題</button>
-        </h2>
-        <div id="ov-project-issues"></div>
-      </div>
+    <div class="card" style="margin-bottom:0;">
+      <h2 class="y" style="display:flex;justify-content:space-between;align-items:center;">
+        🔧 ISSUES
+        <div style="display:flex;gap:6px;">
+          <button class="btn btn-p btn-sm" onclick="openIssueModal('process')">＋ 業務</button>
+          <button class="btn btn-p btn-sm" onclick="openIssueModal('project')">＋ PJ</button>
+        </div>
+      </h2>
+      <!-- process + project 統合表示 -->
+      <div id="ov-process-issues"></div>
+      <div id="ov-project-issues"></div>
     </div>
     <!-- AIアクション -->
     <div class="card">
@@ -2554,7 +2553,7 @@ function renderInbox(){
       +'<option value="tasked"'  +(ibStatus==='tasked'   ?' selected':'')+'>📋 タスク化</option>'
       +'<option value="archived"'+(ibStatus==='archived' ?' selected':'')+'>📦 済</option>'
       +'</select> '
-      +'<button class="btn btn-cop btn-sm" onclick="openAIWithInbox('+i+')">🤖</button> '
+      +'<div>'+buildAIBtns(i)+'</div>'
       +'<button class="btn btn-s btn-sm" onclick="promoteInboxToTask('+i+')">⬆</button> '
       +'<button class="btn btn-d btn-sm" onclick="deleteInbox('+i+')">削除</button>'
       +'</td></tr>';
@@ -3159,6 +3158,83 @@ var NOW_MODES = [
 // ===== TODAY FOCUS =====
 
 /** フォーカスをdailyStateに保存 */
+
+// ===== Step F: AI投入テンプレ =====
+var AI_SEND_TEMPLATES = [
+  { id:'brainstorm', label:'💭 壁打ち',
+    purpose:'アイデアの壁打ち・批判的フィードバック',
+    output:'批判・改善案・発展アイデアのリスト' },
+  { id:'note',       label:'📝 note化',
+    purpose:'note記事として書くための構成と下書き',
+    output:'タイトル案・構成（導入/本文/まとめ）・書き出し文' },
+  { id:'structure',  label:'🗂 構造化',
+    purpose:'論点・課題・解決策を整理して構造化',
+    output:'箇条書きで整理された構造（問題/原因/対策）' },
+  { id:'lp',         label:'🚀 LP化',
+    purpose:'ランディングページのコピーとコンテンツ設計',
+    output:'キャッチ・課題提示・解決策・CTA のLP構成' },
+  { id:'uireview',   label:'🎨 UIレビュー',
+    purpose:'UI/UXの観点でのフィードバックと改善案',
+    output:'問題点リスト・改善提案・優先順位' },
+  { id:'tech',       label:'🔧 技術整理',
+    purpose:'技術的な内容の整理・調査・実装方針の提案',
+    output:'技術概要・実装ステップ・注意点' }
+];
+
+/** AI投入ブリーフを自動生成 */
+function buildAIBrief(subject, memo, template){
+  var tmpl = AI_SEND_TEMPLATES.find(function(t){ return t.id === template; })
+    || AI_SEND_TEMPLATES[0];
+  return '# インプット\n\n'
+    + '【目的】' + tmpl.purpose + '\n'
+    + '【背景・内容】' + subject + '\n'
+    + (memo ? '【詳細メモ】' + memo + '\n' : '')
+    + '【欲しい出力】' + tmpl.output + '\n\n'
+    + '上記をふまえて、具体的に回答してください。';
+}
+
+/** テンプレ選択→コピー→AI起動（10秒フロー） */
+function sendToAI(inboxIdx, aiId, templateId){
+  var ib = inbox[inboxIdx];
+  if(!ib) return;
+  var brief = buildAIBrief(ib.subject||'', ib.memo||'', templateId);
+  var targets = getAITargets();
+  var ai = targets.find(function(t){ return t.id === aiId; }) || targets[0];
+  if(!ai) return;
+  copyToClipboard(brief).then(function(){
+    inbox[inboxIdx].maturity = 'ai-sent';
+    inbox[inboxIdx].status   = 'ai-sent';
+    afterChange();
+    renderInbox();
+    renderNowAICandidates();
+    showBanner('📋 コピー済み → ' + ai.label + ' に貼り付けてください');
+    window.open(ai.url, '_blank');
+  }).catch(function(){
+    showBanner('⚠️ コピー失敗。手動でコピーしてください');
+    window.open(ai.url, '_blank');
+  });
+}
+
+/** AI投入ボタン群HTML生成（インライン用） */
+function buildAIBtns(inboxIdx, compact){
+  var targets = getAITargets();
+  if(!targets.length) return '';
+  // テンプレ選択セレクト + AIボタン
+  var tmplOpts = AI_SEND_TEMPLATES.map(function(t){
+    return '<option value="'+t.id+'">'+t.label+'</option>';
+  }).join('');
+
+  var selectId = 'ai-tmpl-'+inboxIdx;
+  var btns = targets.map(function(ai){
+    return '<button class="btn btn-sm" style="background:'+ai.color+';color:#fff;min-height:30px;padding:2px 8px;font-size:11px;" '
+      +'onclick="sendToAI('+inboxIdx+',''+ai.id+'',document.getElementById(''+selectId+'').value)">'+escAttr(ai.label)+'</button>';
+  }).join('');
+
+  return '<div style="display:flex;gap:4px;align-items:center;margin-top:5px;flex-wrap:wrap;">'
+    +'<select id="'+selectId+'" style="font-size:10px;padding:2px 4px;min-height:28px;flex:1;min-width:90px;">'+tmplOpts+'</select>'
+    + btns
+    +'</div>';
+}
 function getTodayFocus(){
   var s = getTodayState();
   return s.focus || [];
@@ -3559,14 +3635,15 @@ function renderNowAICandidates(){
     var tags = c.tags.slice(0,3).map(function(t){
       return '<span style="font-size:9px;background:var(--surface3);color:var(--text3);border:1px solid var(--border);border-radius:3px;padding:0 3px;margin:0 1px;">'+escAttr(t)+'</span>';
     }).join('');
-    return '<div class="ai-candidate-item" onclick="openAIWithInbox('+c.idx+')">'
-      +'<span style="font-size:12px;color:var(--accent2);">🤖</span>'
+    return '<div class="ai-candidate-item">'
       +'<div style="flex:1;min-width:0;">'
       +'<div style="font-weight:600;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+db+' '+escAttr(c.text)+'</div>'
       +'<div style="margin-top:2px;display:flex;gap:4px;align-items:center;flex-wrap:wrap;">'
-      +'<span style="font-size:9px;color:var(--text3);">'+escAttr(c.label)+'</span>'+tags+'</div>'
+      +'<span style="font-size:9px;color:var(--text3);">'+escAttr(c.label)+'</span>'+tags
+      +'<span style="font-size:10px;letter-spacing:-2px;color:#f5a623;">'+heatStr+'</span>'
       +'</div>'
-      +'<span style="font-size:10px;letter-spacing:-2px;flex-shrink:0;">'+heatStr+'</span>'
+      + buildAIBtns(c.idx, true)
+      +'</div>'
       +'</div>';
   }).join('');
 }
