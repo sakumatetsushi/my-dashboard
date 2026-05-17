@@ -588,15 +588,17 @@ body.is-mobile .mobile-only { display: block !important; }
 
 <div id="fs-bar">
   <span id="fs-status">📁 フォルダ未設定</span>
-  <span id="dbx-badge" style="display:none;font-size:10px;background:#0061ff;color:#fff;border-radius:10px;padding:2px 8px;font-weight:700;"></span>
+  <span id="dbx-badge" style="display:none;font-size:10px;background:#0061ff;color:#fff;border-radius:10px;padding:2px 8px;font-weight:700;">☁️ Dropbox接続中</span>
   <span id="ls-mode-badge" style="display:none;font-size:10px;background:#f5a623;color:#000;border-radius:10px;padding:2px 8px;font-weight:700;">📱 ローカルモード</span>
-  <button class="btn btn-p btn-sm" onclick="selectFolder()">フォルダ選択</button>
+  <!-- Dropbox未接続時のみ表示 -->
+  <button id="btn-folder-select" class="btn btn-p btn-sm" onclick="selectFolder()">フォルダ選択</button>
   <button class="btn btn-s btn-sm" onclick="manualSave()">💾 保存</button>
   <button class="btn btn-g btn-sm" onclick="manualLoad()">📂 読み込み</button>
   <button id="btn-merge-to-folder" class="btn btn-sm" style="display:none;background:#e67e22;color:#fff" onclick="mergeLocalToFolder()">📤 PC同期</button>
   <button class="btn btn-sm" style="background:#8e44ad;color:#fff" onclick="showBackupModal()">📦 バックアップ</button>
-  <button id="btn-dbx-connect" class="btn btn-sm" style="background:#0061ff;color:#fff;display:none;" onclick="dbxStartAuth()">☁️ Dropbox接続</button>
-  <button id="btn-dbx-disconnect" class="btn btn-sm" style="background:#555;color:#fff;display:none;" onclick="dbxDisconnect()">🔌 Dropbox解除</button>
+  <!-- Dropbox接続・解除ボタン -->
+  <button id="btn-dbx-connect" class="btn btn-sm" style="background:#0061ff;color:#fff;" onclick="dbxStartAuth()">☁️ Dropbox接続</button>
+  <button id="btn-dbx-disconnect" class="btn btn-sm" style="display:none;background:#444;color:#fff;" onclick="dbxDisconnect()">🔌 解除</button>
   <button class="btn btn-sm" style="background:#16a085;color:#fff" onclick="openCategorySettings()">🗂️ プロジェクト設定</button>
 </div>
 
@@ -1995,31 +1997,33 @@ function dbxDisconnect(){
 
 /** DropboxのUI状態を更新 */
 function applyDropboxUI(){
-  var badge  = document.getElementById('dbx-badge');
-  var btnCon = document.getElementById('btn-dbx-connect');
-  var btnDis = document.getElementById('btn-dbx-disconnect');
+  var badge      = document.getElementById('dbx-badge');
+  var btnCon     = document.getElementById('btn-dbx-connect');
+  var btnDis     = document.getElementById('btn-dbx-disconnect');
+  var btnFolder  = document.getElementById('btn-folder-select');
   if(dbxConnected()){
-    if(badge)  { badge.style.display='inline'; badge.textContent='☁️ Dropbox接続中'; }
-    if(btnCon) btnCon.style.display='none';
-    if(btnDis) btnDis.style.display='inline-block';
+    if(badge)     badge.style.display = 'inline';
+    if(btnCon)    btnCon.style.display = 'none';
+    if(btnDis)    btnDis.style.display = 'inline-block';
+    if(btnFolder) btnFolder.style.display = 'none'; // Dropbox接続中はフォルダ選択不要
   } else {
-    if(badge)  badge.style.display='none';
-    if(btnCon) btnCon.style.display='inline-block';
-    if(btnDis) btnDis.style.display='none';
+    if(badge)     badge.style.display = 'none';
+    if(btnCon)    btnCon.style.display = 'inline-block';
+    if(btnDis)    btnDis.style.display = 'none';
+    if(btnFolder) btnFolder.style.display = 'inline-block';
   }
 }
 
 // ===== フォルダ管理 =====
 function updateFolderStatus(msg){
   var el=document.getElementById('fs-status');
-  if(dirHandle){
-    el.textContent='📁 '+dirHandle.name+(msg?' ('+msg+')':' ✅');
-    el.style.color='#27ae60';
-  }else{
-    var saved=localStorage.getItem('lastFolderName');
-    el.textContent=saved?'📁 前回: '+saved+' (未接続)':'📁 フォルダ未設定';
-    el.style.color='#e67e22';
-  }
+  if(!el) return;
+  if(msg){ el.textContent='📁 '+msg; el.style.color='var(--success)'; return; }
+  if(dbxConnected()){ el.textContent='☁️ Dropbox接続中'; el.style.color='#0061ff'; return; }
+  if(dirHandle){ el.textContent='📁 '+dirHandle.name+' ✅'; el.style.color='var(--success)'; return; }
+  var saved=localStorage.getItem('lastFolderName');
+  el.textContent = saved ? '📁 前回: '+saved+' (未接続)' : '📁 フォルダ未設定';
+  el.style.color = 'var(--warn)';
 }
 // ===== localStorageモード（スマホ用） =====
 var localStorageMode = false; // フォルダ未接続時のモード
@@ -3913,7 +3917,7 @@ function renderProcessIssues(){
   el.innerHTML=html;
 }
 
-function renderAll(){refreshModelSelects();renderOverview();renderLinks();renderAgentLinks();}
+function renderAll(){refreshModelSelects();renderOverview();renderLinks();renderAgentLinks();renderQuickLinks();}
 var issueModalType = 'process'; // 'process' or 'project'
 var issueEditType = '';
 var issueEditIdx = -1;
@@ -4759,6 +4763,7 @@ document.addEventListener('DOMContentLoaded', async function(){
 
   // Dropboxトークン復元
   dbxLoadTokens();
+  applyDropboxUI(); // 初期ボタン状態を設定
 
   // OAuthコールバック処理（URLに #access_token= がある場合）
   if(location.hash.indexOf('access_token=') >= 0){
