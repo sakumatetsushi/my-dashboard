@@ -3231,7 +3231,7 @@ function buildAIBtns(inboxIdx, compact){
   var selectId = 'ai-tmpl-'+inboxIdx;
   var btns = targets.map(function(ai){
     return '<button class="btn btn-sm" style="background:'+ai.color+';color:#fff;min-height:30px;padding:2px 8px;font-size:11px;" '
-      +'onclick="sendToAI('+inboxIdx+',''+ai.id+'',document.getElementById(''+selectId+'').value)">'+escAttr(ai.label)+'</button>';
+      +'onclick="sendToAI('+inboxIdx+',\''+ai.id+'\',document.getElementById(\''+selectId+'\').value)">'+escAttr(ai.label)+'</button>';
   }).join('');
 
   return '<div style="display:flex;gap:4px;align-items:center;margin-top:5px;flex-wrap:wrap;">'
@@ -4761,9 +4761,15 @@ document.addEventListener('DOMContentLoaded', async function(){
   var noteEl = document.getElementById('now-note');
   if(noteEl) noteEl.addEventListener('input', function(){ this.dataset.edited='1'; });
 
+  // 常に基本描画を実行（接続状態に関わらず）
+  loadLocalBackup();
+  renderAll();
+  renderQuickLinks();
+
   // Dropboxトークン復元
   dbxLoadTokens();
-  applyDropboxUI(); // 初期ボタン状態を設定
+  applyDropboxUI();
+  updateFolderStatus();
 
   // OAuthコールバック処理（URLに #access_token= がある場合）
   if(location.hash.indexOf('access_token=') >= 0){
@@ -4789,16 +4795,11 @@ document.addEventListener('DOMContentLoaded', async function(){
   // localStorageModeの復元
   if(localStorage.getItem('preferLocalStorageMode')==='1'){
     localStorageMode = true;
-    loadLocalBackup();
-    renderAll();
-    renderQuickLinks();
-    applyNoteSettings();
-    hideStartupOverlay();
     applyLocalStorageModeUI();
-    return;
+    return; // 既にloadLocalBackup+renderAll済み
   }
 
-  // どれでもなければスタートアップ画面
+  // どれでもなければスタートアップ画面を表示
   showStartupOverlay();
 });
 
