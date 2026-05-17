@@ -1918,10 +1918,18 @@ async function dbxReadFile(name){
         'Dropbox-API-Arg': JSON.stringify({path: path})
       }
     });
-    if(res.status === 409) return null; // ファイルなし
-    if(!res.ok) return null;
+    if(res.status === 409) return null; // ファイルなし or フォルダなし → 正常扱い
+    if(res.status === 400) return null; // パス不正
+    if(res.status === 401) return null; // 認証エラー（リフレッシュ試行済み）
+    if(!res.ok){
+      console.warn('DBX read ' + name + ': status=' + res.status);
+      return null;
+    }
     return await res.text();
-  }catch(e){ return null; }
+  }catch(e){
+    console.warn('DBX read ' + name + ':', e.message);
+    return null;
+  }
 }
 
 /** 接続解除 */
@@ -4475,6 +4483,12 @@ document.addEventListener('DOMContentLoaded', async function(){
 /** Dropbox接続後の初期ロード */
 async function dbxStartupLoad(){
   try{
+    // まずフォルダ構造を確認
+    var folderOk = await dbxCheckFolder();
+    if(!folderOk){
+      // フォルダが存在しない → 作成して空の状態で開始
+      showBanner('📁 connect_jsonフォルダが見つかりません。新規作成します');
+    }
     await loadAll();
     await loadDashSettings();
     renderAll();
@@ -4485,7 +4499,7 @@ async function dbxStartupLoad(){
     updateFolderStatus('Dropbox接続済み');
     showBanner('✅ Dropboxからデータを読み込みました');
   } catch(e){
-    // トークン期限切れの可能性 → リフレッシュ試行
+    console.error('dbxStartupLoad error:', e);
     var refreshed = await dbxRefreshToken();
     if(refreshed){
       await dbxStartupLoad();
@@ -4496,6 +4510,33 @@ async function dbxStartupLoad(){
       showStartupOverlay();
       showBanner('⚠️ Dropbox再接続が必要です');
     }
+  }
+}
+
+/** Dropboxのフォルダ構造を確認 */
+async function dbxCheckFolder(){
+  try{
+    var res = await dbxFetch(DBX_BASE + 'files/list_folder', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({path: '', recursive: false})
+    });
+    if(!res.ok){ console.warn('DBX list root: status='+res.status); return false; }
+    var data = await res.json();
+    var entries = data.entries || [];
+    console.log('DBX App folder contents:', entries.map(function(e){ return e.name; }));
+    // connect_jsonフォルダの存在確認
+    var hasFolder = entries.some(function(e){
+      return e.name === 'connect_json' && e['.tag'] === 'folder';
+    });
+    if(!hasFolder){
+      console.warn('DBX: connect_json folder not found. Available:', entries.map(function(e){ return e.name+' ('+e['.tag']+')'; }));
+      showBanner('⚠️ Dropboxに connect_json フォルダが見つかりません（コンソールで詳細確認）');
+    }
+    return hasFolder;
+  }catch(e){
+    console.error('DBX checkFolder:', e);
+    return false;
   }
 }
 
