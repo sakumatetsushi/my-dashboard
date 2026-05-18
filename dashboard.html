@@ -562,6 +562,7 @@ body.is-mobile .mobile-only { display: block !important; }
 /* フォーカス外タスクを薄く（NEXT ACTIONSテーブル） */
 .focus-dimmed td{opacity:.35;}
 .active-filter{background:var(--accent2) !important;color:#fff !important;}
+@keyframes spin{from{transform:rotate(0deg);}to{transform:rotate(360deg);}}
 /* フォーカス設定モーダル */
 .focus-edit-row{
   display:flex;align-items:center;gap:8px;
@@ -1116,6 +1117,75 @@ body.is-mobile .mobile-only { display: block !important; }
     <div id="loop-list"></div>
     <button class="btn btn-g btn-sm" style="width:100%;margin-top:6px;" onclick="openFamilyLoopModal()">＋ 新しいループを追加</button>
   </div>
+
+  <!-- ④ スクショ読み込み（GPT Vision） -->
+  <div class="family-section">
+    <div class="family-section-title">
+      📷 スクショ読み込み
+      <span style="font-size:10px;color:var(--text3);">TimeTreeなどの予定画像 → 自動解析</span>
+    </div>
+
+    <!-- APIキー設定（折りたたみ） -->
+    <details style="margin-bottom:10px;">
+      <summary style="font-size:11px;color:var(--text3);cursor:pointer;user-select:none;">
+        ⚙️ GPT APIキー設定
+      </summary>
+      <div style="margin-top:8px;display:flex;gap:8px;align-items:center;">
+        <input type="password" id="gpt-api-key-input"
+          placeholder="sk-proj-..."
+          style="flex:1;font-size:11px;"
+          value="">
+        <button class="btn btn-s btn-sm" onclick="applyGptApiKey()">保存</button>
+        <button class="btn btn-d btn-sm" onclick="clearGptApiKey()">削除</button>
+      </div>
+      <div id="gpt-key-status" style="font-size:10px;margin-top:4px;color:var(--text3);"></div>
+    </details>
+
+    <!-- ドロップゾーン -->
+    <div id="screenshot-drop-zone"
+      style="border:2px dashed var(--border);border-radius:10px;padding:24px;text-align:center;cursor:pointer;transition:all .2s;background:var(--surface2);"
+      onclick="document.getElementById('screenshot-file-input').click()"
+      ondragover="event.preventDefault();this.style.borderColor='var(--accent2)';this.style.background='var(--surface3)';"
+      ondragleave="this.style.borderColor='var(--border)';this.style.background='var(--surface2)';"
+      ondrop="handleScreenshotDrop(event)">
+      <div style="font-size:28px;margin-bottom:8px;">📷</div>
+      <div style="font-size:13px;font-weight:600;color:var(--text2);">画像をドロップ または クリックして選択</div>
+      <div style="font-size:11px;color:var(--text3);margin-top:4px;">TimeTree・Googleカレンダー等のスクショをそのまま</div>
+    </div>
+    <input type="file" id="screenshot-file-input" accept="image/*" style="display:none;" onchange="handleScreenshotFile(this)">
+
+    <!-- プレビュー -->
+    <div id="screenshot-preview" style="display:none;margin-top:10px;">
+      <img id="screenshot-img" style="max-width:100%;border-radius:8px;border:1px solid var(--border);">
+      <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
+        <select id="screenshot-mode" style="flex:1;font-size:12px;">
+          <option value="week">今週の予定を読み取る（TODAY/THIS WEEK）</option>
+          <option value="events">イベント・長期予定を読み取る（UPCOMING）</option>
+          <option value="both">両方読み取る</option>
+        </select>
+        <button class="btn btn-sm" style="background:linear-gradient(135deg,#10a37f,#00d4aa);color:#fff;min-height:36px;padding:6px 16px;"
+          onclick="analyzeScreenshot()">🤖 GPTで解析</button>
+        <button class="btn btn-g btn-sm" onclick="clearScreenshot()">✕ クリア</button>
+      </div>
+    </div>
+
+    <!-- 解析結果 -->
+    <div id="screenshot-result" style="display:none;margin-top:10px;">
+      <div style="font-size:10px;color:var(--text3);font-weight:700;letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px;">📋 解析結果</div>
+      <div id="screenshot-result-content" style="background:var(--surface2);border-radius:8px;padding:12px;font-size:12px;border:1px solid var(--border);max-height:280px;overflow-y:auto;"></div>
+      <div style="display:flex;gap:8px;margin-top:8px;">
+        <button class="btn btn-s" onclick="applyScreenshotResult()" style="flex:1;">✅ FAMILYに反映する</button>
+        <button class="btn btn-g btn-sm" onclick="document.getElementById('screenshot-result').style.display='none';">キャンセル</button>
+      </div>
+    </div>
+
+    <!-- ローディング -->
+    <div id="screenshot-loading" style="display:none;text-align:center;padding:16px;color:var(--text2);font-size:12px;">
+      <div style="font-size:20px;animation:spin 1s linear infinite;display:inline-block;">⏳</div>
+      <div style="margin-top:6px;">GPTが画像を解析中...</div>
+    </div>
+  </div>
+
 
 </div>
 
@@ -2641,6 +2711,19 @@ function addQuickInboxAndSend(aiId){
 }
 
 
+// ===== GPT Vision 設定 =====
+var GPT_API_KEY = localStorage.getItem('gpt_api_key') || '';
+var GPT_MODEL   = 'gpt-4o';
+var GPT_API_URL = 'https://api.openai.com/v1/chat/completions';
+
+function saveGptApiKey(key){
+  GPT_API_KEY = key;
+  localStorage.setItem('gpt_api_key', key);
+}
+function getGptApiKey(){
+  return localStorage.getItem('gpt_api_key') || '';
+}
+
 // ===== FAMILY DATA =====
 var familyEvents = []; // {id,icon,title,dateStart,dateEnd,actions:[{text,done}],memo,created}
 var familyLoops  = []; // {id,kind,title,note,created}
@@ -2947,9 +3030,227 @@ function renderFamily(){
   renderFamilyWeek();
   renderUpcoming();
   renderFamilyLoops();
+  updateGptKeyStatus();
 }
 
 // ===== active-filter CSS =====
+
+// ===== GPT Vision スクショ解析 =====
+var screenshotBase64 = null;
+var screenshotResult = null; // 解析済みJSON
+
+function applyGptApiKey(){
+  var key = (document.getElementById('gpt-api-key-input')||{value:''}).value.trim();
+  if(!key){ showBanner('⚠️ APIキーを入力してください'); return; }
+  saveGptApiKey(key);
+  updateGptKeyStatus();
+  showBanner('✅ GPT APIキーを保存しました');
+}
+function clearGptApiKey(){
+  GPT_API_KEY = '';
+  localStorage.removeItem('gpt_api_key');
+  var el = document.getElementById('gpt-api-key-input');
+  if(el) el.value = '';
+  updateGptKeyStatus();
+  showBanner('🗑 GPT APIキーを削除しました');
+}
+function updateGptKeyStatus(){
+  var el = document.getElementById('gpt-key-status');
+  if(!el) return;
+  var key = getGptApiKey();
+  if(key){
+    el.textContent = '✅ キー設定済み: sk-...'+key.slice(-6);
+    el.style.color = 'var(--success)';
+    GPT_API_KEY = key;
+  } else {
+    el.textContent = '未設定';
+    el.style.color = 'var(--text3)';
+  }
+}
+
+function handleScreenshotDrop(e){
+  e.preventDefault();
+  var dz = document.getElementById('screenshot-drop-zone');
+  if(dz){ dz.style.borderColor='var(--border)'; dz.style.background='var(--surface2)'; }
+  var file = e.dataTransfer.files[0];
+  if(file && file.type.startsWith('image/')) loadScreenshotFile(file);
+}
+function handleScreenshotFile(input){
+  var file = input.files[0];
+  if(file) loadScreenshotFile(file);
+}
+function loadScreenshotFile(file){
+  var reader = new FileReader();
+  reader.onload = function(e){
+    screenshotBase64 = e.target.result.split(',')[1]; // base64のみ
+    var img = document.getElementById('screenshot-img');
+    if(img) img.src = e.target.result;
+    var preview = document.getElementById('screenshot-preview');
+    if(preview) preview.style.display = 'block';
+    var result = document.getElementById('screenshot-result');
+    if(result) result.style.display = 'none';
+    screenshotResult = null;
+  };
+  reader.readAsDataURL(file);
+}
+function clearScreenshot(){
+  screenshotBase64 = null;
+  screenshotResult = null;
+  var preview = document.getElementById('screenshot-preview');
+  if(preview) preview.style.display = 'none';
+  var result = document.getElementById('screenshot-result');
+  if(result) result.style.display = 'none';
+  var inp = document.getElementById('screenshot-file-input');
+  if(inp) inp.value = '';
+}
+
+async function analyzeScreenshot(){
+  GPT_API_KEY = getGptApiKey();
+  if(!GPT_API_KEY){
+    showBanner('⚠️ GPT APIキーを設定してください（⚙️ GPT APIキー設定を開く）');
+    return;
+  }
+  if(!screenshotBase64){
+    showBanner('⚠️ 画像を選択してください');
+    return;
+  }
+
+  var mode = (document.getElementById('screenshot-mode')||{value:'week'}).value;
+  var loading = document.getElementById('screenshot-loading');
+  var result  = document.getElementById('screenshot-result');
+  if(loading) loading.style.display = 'block';
+  if(result)  result.style.display  = 'none';
+
+  // モード別プロンプト
+  var basePrompt = 'カレンダーのスクリーンショットです。予定をJSON形式だけで返してください。説明文・コードブロック不要。';
+  var promptWeek   = basePrompt + '形式: {"weekNote":"月曜: 内容\n火曜: 内容\n..."}';
+  var promptEvents = basePrompt + '形式: {"events":[{"icon":"絵文字","title":"名前","dateStart":"YYYY-MM-DD","dateEnd":"YYYY-MM-DD","memo":"メモ"}]}';
+  var promptBoth   = basePrompt + '形式: {"weekNote":"今週の予定","events":[{"icon":"絵文字","title":"名前","dateStart":"YYYY-MM-DD","dateEnd":"YYYY-MM-DD","memo":"メモ"}]}';
+  var prompts = {week: promptWeek, events: promptEvents, both: promptBoth};
+
+  var prompt = prompts[mode] || prompts['week'];
+
+  try{
+    var res = await fetch(GPT_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type':  'application/json',
+        'Authorization': 'Bearer ' + GPT_API_KEY
+      },
+      body: JSON.stringify({
+        model: GPT_MODEL,
+        max_tokens: 1000,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'text', text: prompt },
+            { type: 'image_url', image_url: { url: 'data:image/jpeg;base64,' + screenshotBase64, detail: 'high' } }
+          ]
+        }]
+      })
+    });
+
+    if(!res.ok){
+      var err = await res.json();
+      throw new Error(err.error ? err.error.message : 'APIエラー: '+res.status);
+    }
+
+    var data = await res.json();
+    var text = data.choices[0].message.content.trim();
+
+    // JSONを抽出（```json ... ``` や ``` ... ``` を除去）
+    text = text.replace(/^```json\s*/,'').replace(/^```\s*/,'').replace(/\s*```$/,'').trim();
+
+    var parsed = JSON.parse(text);
+    screenshotResult = parsed;
+    renderScreenshotResult(parsed, mode);
+
+  } catch(e){
+    showBanner('⚠️ 解析エラー: ' + e.message);
+    console.error('GPT Vision error:', e);
+  } finally {
+    if(loading) loading.style.display = 'none';
+  }
+}
+
+function renderScreenshotResult(parsed, mode){
+  var el = document.getElementById('screenshot-result-content');
+  var container = document.getElementById('screenshot-result');
+  if(!el || !container) return;
+
+  var html = '';
+
+  if(parsed.weekNote){
+    html += '<div style="margin-bottom:10px;">'
+      + '<div style="font-size:10px;font-weight:700;color:var(--accent);margin-bottom:4px;">📅 TODAY / THIS WEEK</div>'
+      + '<div style="white-space:pre-wrap;color:var(--text2);">' + escHtml(parsed.weekNote) + '</div>'
+      + '</div>';
+  }
+
+  if(parsed.events && parsed.events.length){
+    html += '<div>'
+      + '<div style="font-size:10px;font-weight:700;color:var(--accent2);margin-bottom:6px;">🗓 UPCOMING (' + parsed.events.length + '件)</div>'
+      + parsed.events.map(function(ev){
+          return '<div style="padding:6px 8px;background:var(--surface);border-radius:6px;margin-bottom:5px;border:1px solid var(--border);">'
+            + (ev.icon||'📅') + ' <strong>' + escHtml(ev.title) + '</strong>'
+            + (ev.dateStart ? ' <span style="color:var(--text3);font-size:10px;">'+ev.dateStart+'</span>' : '')
+            + (ev.memo ? '<div style="font-size:10px;color:var(--text3);margin-top:2px;">'+escHtml(ev.memo)+'</div>' : '')
+            + '</div>';
+        }).join('')
+      + '</div>';
+  }
+
+  if(!html){
+    html = '<div style="color:var(--text3);">解析結果が空でした。別のモードを試してください。</div>';
+  }
+
+  el.innerHTML = html;
+  container.style.display = 'block';
+}
+
+function applyScreenshotResult(){
+  if(!screenshotResult){ showBanner('⚠️ 先に解析してください'); return; }
+  var applied = [];
+
+  // weekNoteを今週のメモに反映
+  if(screenshotResult.weekNote){
+    var key = getWeekKey(familyWeekOffset);
+    familyWeekNotes[key] = screenshotResult.weekNote;
+    var el = document.getElementById('family-week-note');
+    if(el) el.textContent = screenshotResult.weekNote;
+    applied.push('今週のメモ');
+  }
+
+  // eventsをUPCOMINGに追加
+  if(screenshotResult.events && screenshotResult.events.length){
+    screenshotResult.events.forEach(function(ev){
+      familyEvents.push({
+        id:        familyUUID(),
+        icon:      ev.icon || '📅',
+        title:     ev.title || '（タイトルなし）',
+        dateStart: ev.dateStart || '',
+        dateEnd:   ev.dateEnd   || '',
+        actions:   [],
+        memo:      ev.memo || '',
+        created:   todayStr()
+      });
+    });
+    applied.push('イベント'+screenshotResult.events.length+'件');
+  }
+
+  if(!applied.length){
+    showBanner('⚠️ 反映するデータがありませんでした');
+    return;
+  }
+
+  afterChange();
+  renderFamilyWeek();
+  renderUpcoming();
+  clearScreenshot();
+  document.getElementById('screenshot-result').style.display = 'none';
+  showBanner('✅ 反映しました: ' + applied.join(' / '));
+}
+
 function statusLabel(s){
   var m={before_start:'構想中',before_request:'依頼前',investigate:'調査・探索',design:'設計・検討',review:'FB待ち',research:'実験・研究',wait:'外部待ち',document:'執筆・記録',process:'処理中',rework:'再検討',done:'完了',active:'進行中',risk:'要注意'};
   return m[s]||s;
@@ -5284,6 +5585,8 @@ document.addEventListener('DOMContentLoaded', async function(){
   updateFolderStatus();
   applyMobileClass();
   window.addEventListener('resize', applyMobileClass);
+  // GPT APIキー復元
+  GPT_API_KEY = getGptApiKey();
 
   // note編集フラグ
   var noteEl = document.getElementById('now-note');
