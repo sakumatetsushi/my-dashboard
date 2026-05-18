@@ -561,12 +561,86 @@ body.is-mobile .mobile-only { display: block !important; }
 .focus-impact-low {background:var(--surface3);color:var(--text3);border:1px solid var(--border);}
 /* フォーカス外タスクを薄く（NEXT ACTIONSテーブル） */
 .focus-dimmed td{opacity:.35;}
+.active-filter{background:var(--accent2) !important;color:#fff !important;}
 /* フォーカス設定モーダル */
 .focus-edit-row{
   display:flex;align-items:center;gap:8px;
   padding:8px 10px;background:var(--surface2);
   border-radius:8px;margin-bottom:6px;border:1px solid var(--border);
 }
+
+/* ===== FAMILY TAB ===== */
+.family-section{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);padding:14px;margin-bottom:14px;
+}
+.family-section-title{
+  font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--text3);margin-bottom:10px;
+  display:flex;align-items:center;justify-content:space-between;
+}
+.family-section-title span{color:var(--text2);font-size:11px;}
+/* TODAY block */
+.week-note-area{
+  background:var(--surface2);border-radius:8px;padding:10px 12px;
+  font-size:12px;color:var(--text2);line-height:1.8;
+  border:1px solid var(--border);min-height:60px;
+  white-space:pre-wrap;outline:none;
+}
+.week-note-area:focus{border-color:var(--accent);}
+/* UPCOMING event cards */
+.upcoming-card{
+  display:flex;align-items:flex-start;gap:12px;
+  padding:12px;background:var(--surface2);border-radius:10px;
+  border:1px solid var(--border);margin-bottom:8px;
+  transition:border-color .15s;
+}
+.upcoming-card:hover{border-color:var(--accent2);}
+.upcoming-card .ev-icon{font-size:24px;flex-shrink:0;line-height:1;}
+.upcoming-card .ev-body{flex:1;min-width:0;}
+.upcoming-card .ev-title{font-size:13px;font-weight:700;color:var(--text);margin-bottom:3px;}
+.upcoming-card .ev-date{font-size:11px;color:var(--text3);}
+.upcoming-card .ev-days{
+  display:inline-block;font-size:10px;font-weight:700;
+  padding:2px 7px;border-radius:10px;margin-left:6px;
+  background:var(--accent2);color:#fff;
+}
+.upcoming-card .ev-days.soon{background:var(--danger);}
+.upcoming-card .ev-days.near{background:var(--warn);}
+.ev-next-actions{margin-top:6px;}
+.ev-next-action{
+  display:flex;align-items:center;gap:6px;
+  font-size:11px;color:var(--text2);padding:2px 0;
+}
+.ev-next-action input[type=checkbox]{accent-color:var(--accent2);}
+.ev-next-action.done-action{opacity:.45;text-decoration:line-through;}
+.ev-progress{
+  font-size:20px;font-weight:700;color:var(--accent2);
+  min-width:44px;text-align:center;flex-shrink:0;
+}
+/* OPEN LOOPS */
+.loop-item{
+  display:flex;align-items:flex-start;gap:10px;
+  padding:10px 12px;background:var(--surface2);border-radius:8px;
+  border:1px solid var(--border);margin-bottom:6px;
+  cursor:pointer;transition:border-color .15s;
+}
+.loop-item:hover{border-color:var(--accent);}
+.loop-kind-dot{
+  width:10px;height:10px;border-radius:50%;flex-shrink:0;margin-top:4px;
+}
+.loop-worry{background:#f05252;}
+.loop-thinking{background:#f5a623;}
+.loop-idea{background:#00d4aa;}
+.loop-title{font-size:12px;font-weight:600;color:var(--text);}
+.loop-note{font-size:10px;color:var(--text3);margin-top:2px;}
+.loop-kind-badge{
+  font-size:9px;font-weight:700;padding:2px 6px;border-radius:8px;
+  flex-shrink:0;
+}
+/* Family モーダル共通 */
+.family-modal-section{margin-bottom:14px;}
+.family-modal-section label{font-size:11px;color:var(--text3);display:block;margin-bottom:4px;font-weight:700;letter-spacing:.04em;}
 </style>
 </head>
 <body>
@@ -581,6 +655,7 @@ body.is-mobile .mobile-only { display: block !important; }
   <button onclick="showTab('inbox',this)">📥 案件ログ</button>
   <button onclick="showTab('tasks',this)">📋 タスク管理</button>
   <button onclick="showTab('gantt',this)">📊 ガント</button>
+  <button onclick="showTab('family',this)">🏠 Family</button>
   <button onclick="showTab('note',this)">📓 ノート</button>
   <button onclick="showTab('recent',this)">📂 最近のファイル（🚧工事中）</button>
   <button onclick="showTab('copilot',this)">🤖 AI</button>
@@ -975,6 +1050,137 @@ body.is-mobile .mobile-only { display: block !important; }
 </div>
 
 <!-- ノート -->
+
+<!-- ===== FAMILY TAB ===== -->
+<div id="tab-family" class="tab container">
+
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+    <div>
+      <h1 style="font-size:16px;font-weight:700;background:linear-gradient(90deg,var(--accent2),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">🏠 FAMILY</h1>
+      <div style="font-size:10px;color:var(--text3);margin-top:2px;">現実制約・イベント・悩みをひとつに</div>
+    </div>
+    <div style="display:flex;gap:8px;">
+      <button class="btn btn-sm" style="background:var(--accent2);color:#fff;" onclick="openFamilyEventModal()">＋ イベント</button>
+      <button class="btn btn-sm" style="background:var(--surface2);color:var(--text2);border:1px solid var(--border);" onclick="openFamilyLoopModal()">＋ ループ</button>
+    </div>
+  </div>
+
+  <!-- ① TODAY / THIS WEEK -->
+  <div class="family-section">
+    <div class="family-section-title">
+      📅 TODAY / THIS WEEK
+      <span id="family-week-label"></span>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
+      <button class="btn btn-g btn-sm" onclick="shiftFamilyWeek(-1)">← 先週</button>
+      <button class="btn btn-p btn-sm" onclick="shiftFamilyWeek(0)">今週</button>
+      <button class="btn btn-g btn-sm" onclick="shiftFamilyWeek(1)">来週 →</button>
+    </div>
+    <div
+      id="family-week-note"
+      class="week-note-area"
+      contenteditable="true"
+      placeholder="今週の制約・注意点・予定メモ（自由に入力）"
+      oninput="saveFamilyWeekNote()"
+    ></div>
+    <div style="font-size:10px;color:var(--text3);margin-top:6px;">💡 今週の制約・外出しやすさ・注意点など自由に記録</div>
+  </div>
+
+  <!-- ② UPCOMING -->
+  <div class="family-section">
+    <div class="family-section-title">
+      🗓 UPCOMING — 今後のイベントと準備
+      <span style="font-size:10px;color:var(--text3);" id="upcoming-count"></span>
+    </div>
+    <div id="upcoming-filter" style="display:flex;gap:5px;margin-bottom:10px;flex-wrap:wrap;">
+      <button class="btn btn-sm active-filter" onclick="setUpcomingFilter('all',this)">すべて</button>
+      <button class="btn btn-sm" onclick="setUpcomingFilter('1m',this)">1ヶ月以内</button>
+      <button class="btn btn-sm" onclick="setUpcomingFilter('3m',this)">3ヶ月以内</button>
+      <button class="btn btn-sm" onclick="setUpcomingFilter('6m',this)">6ヶ月以内</button>
+    </div>
+    <div id="upcoming-list"></div>
+    <button class="btn btn-g btn-sm" style="width:100%;margin-top:6px;" onclick="openFamilyEventModal()">＋ イベントを追加</button>
+  </div>
+
+  <!-- ③ OPEN LOOPS -->
+  <div class="family-section">
+    <div class="family-section-title">
+      🔄 OPEN LOOPS — 悩み・検討・アイデア
+      <div style="display:flex;gap:4px;">
+        <button class="btn btn-sm" id="loop-filter-all" onclick="setLoopFilter('all',this)" style="background:var(--accent);color:#fff;">すべて</button>
+        <button class="btn btn-sm" id="loop-filter-worry" onclick="setLoopFilter('worry',this)">😟 悩み</button>
+        <button class="btn btn-sm" id="loop-filter-thinking" onclick="setLoopFilter('thinking',this)">🤔 検討中</button>
+        <button class="btn btn-sm" id="loop-filter-idea" onclick="setLoopFilter('idea',this)">💡 アイデア</button>
+      </div>
+    </div>
+    <div id="loop-list"></div>
+    <button class="btn btn-g btn-sm" style="width:100%;margin-top:6px;" onclick="openFamilyLoopModal()">＋ 新しいループを追加</button>
+  </div>
+
+</div>
+
+<!-- Family イベント追加モーダル -->
+<div class="overlay" id="family-event-overlay" onclick="if(event.target===this)closeFamilyEventModal()">
+  <div class="modal" style="width:580px;">
+    <h3>🗓 イベント追加・編集</h3>
+    <div class="family-modal-section">
+      <label>アイコン・タイトル</label>
+      <div style="display:flex;gap:8px;">
+        <input type="text" id="fe-icon" placeholder="🏕" style="width:50px;text-align:center;font-size:18px;">
+        <input type="text" id="fe-title" placeholder="例: 夏旅行（沖縄）" style="flex:1;font-size:13px;font-weight:600;">
+      </div>
+    </div>
+    <div class="family-modal-section" style="display:flex;gap:10px;">
+      <div style="flex:1;"><label>開始日</label><input type="date" id="fe-date-start" style="width:100%;"></div>
+      <div style="flex:1;"><label>終了日（任意）</label><input type="date" id="fe-date-end" style="width:100%;"></div>
+    </div>
+    <div class="family-modal-section">
+      <label>次にやること（1行1アクション、Enterで追加）</label>
+      <div id="fe-actions-list"></div>
+      <div style="display:flex;gap:6px;margin-top:6px;">
+        <input type="text" id="fe-action-input" placeholder="例: 宿予約（6月中）" style="flex:1;" onkeydown="if(event.key==='Enter'){addFamilyEventAction();event.preventDefault();}">
+        <button class="btn btn-p btn-sm" onclick="addFamilyEventAction()">追加</button>
+      </div>
+    </div>
+    <div class="family-modal-section">
+      <label>メモ</label>
+      <textarea id="fe-memo" rows="3" style="width:100%;" placeholder="子どもが海デビュー！雨天プランも検討"></textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-d btn-sm" id="fe-delete-btn" style="margin-right:auto;display:none;" onclick="deleteFamilyEvent()">削除</button>
+      <button class="btn btn-s" onclick="saveFamilyEvent()">💾 保存</button>
+      <button class="btn btn-g" onclick="closeFamilyEventModal()">キャンセル</button>
+    </div>
+  </div>
+</div>
+
+<!-- Family ループ追加モーダル -->
+<div class="overlay" id="family-loop-overlay" onclick="if(event.target===this)closeFamilyLoopModal()">
+  <div class="modal" style="width:520px;">
+    <h3>🔄 ループ追加・編集</h3>
+    <div class="family-modal-section">
+      <label>種類</label>
+      <div style="display:flex;gap:8px;">
+        <label style="display:flex;align-items:center;gap:4px;cursor:pointer;"><input type="radio" name="fl-kind" value="worry" id="fl-kind-worry"> 😟 悩み</label>
+        <label style="display:flex;align-items:center;gap:4px;cursor:pointer;"><input type="radio" name="fl-kind" value="thinking" id="fl-kind-thinking" checked> 🤔 検討中</label>
+        <label style="display:flex;align-items:center;gap:4px;cursor:pointer;"><input type="radio" name="fl-kind" value="idea" id="fl-kind-idea"> 💡 アイデア</label>
+      </div>
+    </div>
+    <div class="family-modal-section">
+      <label>タイトル</label>
+      <input type="text" id="fl-title" placeholder="例: 習い事、何を優先する？" style="width:100%;font-size:13px;font-weight:600;">
+    </div>
+    <div class="family-modal-section">
+      <label>メモ（現状・背景・考え中のこと）</label>
+      <textarea id="fl-note" rows="4" style="width:100%;" placeholder="スイミング / ピアノ / 英語… 本人の興味も含めて検討したい"></textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-d btn-sm" id="fl-delete-btn" style="margin-right:auto;display:none;" onclick="deleteFamilyLoop()">削除</button>
+      <button class="btn btn-s" onclick="saveFamilyLoop()">💾 保存</button>
+      <button class="btn btn-g" onclick="closeFamilyLoopModal()">キャンセル</button>
+    </div>
+  </div>
+</div>
 <div id="tab-note" class="tab container">
   <div class="card" style="padding:0;overflow:hidden;" id="note-card">
     <div style="display:flex;justify-content:space-between;align-items:center;padding:14px;">
@@ -1707,6 +1913,9 @@ function saveLocalBackup(){
   localStorage.setItem('db3_aiPromptTemplates', JSON.stringify(aiPromptTemplates));
   localStorage.setItem('db3_milestones', JSON.stringify(milestones));
   localStorage.setItem('db3_dailyStates', JSON.stringify(dailyStates));
+  localStorage.setItem('db3_familyEvents', JSON.stringify(familyEvents));
+  localStorage.setItem('db3_familyLoops', JSON.stringify(familyLoops));
+  localStorage.setItem('db3_familyWeekNotes', JSON.stringify(familyWeekNotes));
   localStorage.setItem('db3_phases', JSON.stringify(phases));
 }
 function loadLocalBackup(){
@@ -1722,6 +1931,9 @@ function loadLocalBackup(){
   try{aiPromptTemplates=JSON.parse(localStorage.getItem('db3_aiPromptTemplates')||'{}');if(!aiPromptTemplates.briefing)aiPromptTemplates=JSON.parse(JSON.stringify(DEFAULT_AI_PROMPTS));}catch(e){aiPromptTemplates=JSON.parse(JSON.stringify(DEFAULT_AI_PROMPTS));}
   try{milestones=JSON.parse(localStorage.getItem('db3_milestones')||'[]');}catch(e){milestones=[];}
   try{dailyStates=JSON.parse(localStorage.getItem('db3_dailyStates')||'[]');}catch(e){dailyStates=[];}
+  try{familyEvents=JSON.parse(localStorage.getItem('db3_familyEvents')||'[]');}catch(e){familyEvents=[];}
+  try{familyLoops=JSON.parse(localStorage.getItem('db3_familyLoops')||'[]');}catch(e){familyLoops=[];}
+  try{familyWeekNotes=JSON.parse(localStorage.getItem('db3_familyWeekNotes')||'{}');}catch(e){familyWeekNotes={};}  
   try{phases=JSON.parse(localStorage.getItem('db3_phases')||'[]');}catch(e){phases=[];}
   if(!copilotTemplates.length) copilotTemplates = DEFAULT_TEMPLATES.map(function(t){return {title:t.title,body:t.body};});
   try{ processLinks = JSON.parse(localStorage.getItem('db3_processLinks') || '[]'); }catch(e){}
@@ -2182,6 +2394,9 @@ async function saveAll(){
     await writeFile('aiPromptTemplates.json', JSON.stringify(aiPromptTemplates, null, 2));
     await writeFile('dashSettings.json', JSON.stringify(dashSettings, null, 2));
     await writeFile('dailyStates.json', JSON.stringify(dailyStates, null, 2));
+    await writeFile('familyEvents.json', JSON.stringify(familyEvents, null, 2));
+    await writeFile('familyLoops.json', JSON.stringify(familyLoops, null, 2));
+    await writeFile('familyWeekNotes.json', JSON.stringify(familyWeekNotes, null, 2));
 
     if(!backupDoneThisSession){backupDoneThisSession=true;try{await createBackup('auto');}catch(be){console.warn('Auto-backup:',be);}}
     updateFolderStatus('保存済み');
@@ -2224,6 +2439,9 @@ async function loadAll(){
     var apt=await readFile('aiPromptTemplates.json');if(apt)aiPromptTemplates=JSON.parse(apt);
     var ds=await readFile('dashSettings.json');if(ds)try{dashSettings=JSON.parse(ds);}catch(e){}
     var dst=await readFile('dailyStates.json');if(dst)try{dailyStates=JSON.parse(dst);}catch(e){}
+    var fev=await readFile('familyEvents.json');if(fev)try{familyEvents=JSON.parse(fev);}catch(e){}
+    var flp=await readFile('familyLoops.json');if(flp)try{familyLoops=JSON.parse(flp);}catch(e){}
+    var fwn=await readFile('familyWeekNotes.json');if(fwn)try{familyWeekNotes=JSON.parse(fwn);}catch(e){}
 
     saveLocalBackup();
   }catch(e){console.error(e);}
@@ -2422,6 +2640,316 @@ function addQuickInboxAndSend(aiId){
   });
 }
 
+
+// ===== FAMILY DATA =====
+var familyEvents = []; // {id,icon,title,dateStart,dateEnd,actions:[{text,done}],memo,created}
+var familyLoops  = []; // {id,kind,title,note,created}
+var familyWeekNotes = {}; // {'2026-W20': 'テキスト', ...}
+var familyWeekOffset = 0; // 0=今週, -1=先週, 1=来週
+var upcomingFilter = 'all';
+var loopFilter = 'all';
+var familyEventEditIdx = -1;
+var familyLoopEditIdx  = -1;
+var familyEventTempActions = [];
+
+// ===== ユーティリティ =====
+function getWeekKey(offset){
+  var d = new Date();
+  d.setDate(d.getDate() + offset * 7);
+  // 週の月曜日を基準
+  var day = d.getDay();
+  var mon = new Date(d);
+  mon.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
+  return mon.getFullYear() + '-W' + ('0' + getWeekNumber(mon)).slice(-2);
+}
+function getWeekNumber(d){
+  var date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  var dayNum = date.getUTCDay() || 7;
+  date.setUTCDate(date.getUTCDate() + 4 - dayNum);
+  var yearStart = new Date(Date.UTC(date.getUTCFullYear(),0,1));
+  return Math.ceil((((date - yearStart) / 86400000) + 1)/7);
+}
+function getWeekRange(offset){
+  var d = new Date();
+  d.setDate(d.getDate() + offset * 7);
+  var day = d.getDay();
+  var mon = new Date(d); mon.setDate(d.getDate() - (day===0?6:day-1));
+  var sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+  var fmt = function(dt){ return (dt.getMonth()+1) + '/' + dt.getDate(); };
+  return fmt(mon) + ' 〜 ' + fmt(sun);
+}
+function daysUntil(dateStr){
+  if(!dateStr) return 9999;
+  var d = new Date(dateStr);
+  var now = new Date(); now.setHours(0,0,0,0);
+  return Math.ceil((d - now) / 86400000);
+}
+function familyUUID(){
+  return Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+}
+
+// ===== TODAY / THIS WEEK =====
+function renderFamilyWeek(){
+  var key = getWeekKey(familyWeekOffset);
+  var label = document.getElementById('family-week-label');
+  if(label) label.textContent = getWeekRange(familyWeekOffset);
+  var el = document.getElementById('family-week-note');
+  if(el){
+    var note = familyWeekNotes[key] || '';
+    if(el.textContent !== note) el.textContent = note;
+  }
+}
+function shiftFamilyWeek(dir){
+  if(dir === 0) familyWeekOffset = 0;
+  else familyWeekOffset += dir;
+  renderFamilyWeek();
+}
+function saveFamilyWeekNote(){
+  var key = getWeekKey(familyWeekOffset);
+  var el = document.getElementById('family-week-note');
+  if(el) familyWeekNotes[key] = el.textContent;
+  afterChange();
+}
+
+// ===== UPCOMING =====
+function setUpcomingFilter(f, btn){
+  upcomingFilter = f;
+  document.querySelectorAll('#upcoming-filter .btn').forEach(function(b){ b.classList.remove('active-filter'); b.style.background=''; b.style.color=''; });
+  if(btn){ btn.classList.add('active-filter'); btn.style.background='var(--accent2)'; btn.style.color='#fff'; }
+  renderUpcoming();
+}
+function renderUpcoming(){
+  var el = document.getElementById('upcoming-list');
+  var cnt = document.getElementById('upcoming-count');
+  if(!el) return;
+
+  var now = new Date(); now.setHours(0,0,0,0);
+  var filtered = familyEvents.filter(function(ev){
+    var d = daysUntil(ev.dateStart);
+    if(upcomingFilter === '1m') return d <= 31;
+    if(upcomingFilter === '3m') return d <= 92;
+    if(upcomingFilter === '6m') return d <= 184;
+    return true;
+  });
+  filtered.sort(function(a,b){ return (a.dateStart||'9999') < (b.dateStart||'9999') ? -1 : 1; });
+  if(cnt) cnt.textContent = filtered.length + '件';
+
+  if(!filtered.length){
+    el.innerHTML = '<div class="empty">イベントなし　→ 「＋ イベント」から追加</div>';
+    return;
+  }
+
+  el.innerHTML = filtered.map(function(ev){
+    var idx = familyEvents.indexOf(ev);
+    var days = daysUntil(ev.dateStart);
+    var daysClass = days <= 14 ? 'soon' : days <= 45 ? 'near' : '';
+    var daysLabel = days < 0 ? '開催済' : days === 0 ? '今日' : 'あと' + days + '日';
+    var dateLabel = ev.dateStart || '';
+    if(ev.dateEnd && ev.dateEnd !== ev.dateStart) dateLabel += ' 〜 ' + ev.dateEnd;
+
+    // 進捗計算
+    var actions = ev.actions || [];
+    var done = actions.filter(function(a){ return a.done; }).length;
+    var pct = actions.length ? Math.round(done / actions.length * 100) : 0;
+
+    var actionHtml = actions.map(function(a, ai){
+      return '<div class="ev-next-action' + (a.done?' done-action':'') + '">'
+        + '<input type="checkbox"' + (a.done?' checked':'') + ' onchange="toggleFamilyAction('+idx+','+ai+',this.checked)">'
+        + '<span>' + escHtml(a.text) + '</span>'
+        + '</div>';
+    }).join('');
+
+    return '<div class="upcoming-card">'
+      + '<div class="ev-icon">' + (ev.icon||'📅') + '</div>'
+      + '<div class="ev-body">'
+      +   '<div class="ev-title">' + escHtml(ev.title)
+      +     '<span class="ev-days ' + daysClass + '">' + daysLabel + '</span>'
+      +   '</div>'
+      +   '<div class="ev-date">' + escHtml(dateLabel) + '</div>'
+      +   (actionHtml ? '<div class="ev-next-actions">' + actionHtml + '</div>' : '')
+      +   (ev.memo ? '<div style="font-size:10px;color:var(--text3);margin-top:4px;">📝 ' + escHtml(ev.memo) + '</div>' : '')
+      + '</div>'
+      + '<div style="display:flex;flex-direction:column;align-items:center;gap:4px;">'
+      +   '<div class="ev-progress">' + (actions.length ? pct + '%' : '') + '</div>'
+      +   '<button class="btn btn-g btn-sm" onclick="openFamilyEventModal('+idx+')" style="font-size:10px;padding:2px 6px;">編集</button>'
+      + '</div>'
+      + '</div>';
+  }).join('');
+}
+function toggleFamilyAction(evIdx, actionIdx, checked){
+  if(familyEvents[evIdx] && familyEvents[evIdx].actions[actionIdx]){
+    familyEvents[evIdx].actions[actionIdx].done = checked;
+    afterChange();
+    renderUpcoming();
+  }
+}
+
+// ===== OPEN LOOPS =====
+function setLoopFilter(f, btn){
+  loopFilter = f;
+  document.querySelectorAll('#tab-family .family-section .btn').forEach(function(b){
+    if(b.id && b.id.startsWith('loop-filter-')){ b.style.background=''; b.style.color=''; }
+  });
+  if(btn){ btn.style.background='var(--accent)'; btn.style.color='#fff'; }
+  renderFamilyLoops();
+}
+function renderFamilyLoops(){
+  var el = document.getElementById('loop-list');
+  if(!el) return;
+  var kindColors = {worry:'#f05252', thinking:'#f5a623', idea:'#00d4aa'};
+  var kindLabels = {worry:'😟 悩み', thinking:'🤔 検討中', idea:'💡 アイデア'};
+  var filtered = loopFilter === 'all'
+    ? familyLoops
+    : familyLoops.filter(function(l){ return l.kind === loopFilter; });
+  if(!filtered.length){
+    el.innerHTML = '<div class="empty">なし</div>';
+    return;
+  }
+  el.innerHTML = filtered.map(function(lp){
+    var idx = familyLoops.indexOf(lp);
+    var col = kindColors[lp.kind] || '#888';
+    var kindBadge = kindLabels[lp.kind] || lp.kind;
+    return '<div class="loop-item" onclick="openFamilyLoopModal('+idx+')">'
+      + '<div class="loop-kind-dot" style="background:'+col+';"></div>'
+      + '<div style="flex:1;min-width:0;">'
+      +   '<div class="loop-title">' + escHtml(lp.title) + '</div>'
+      +   (lp.note ? '<div class="loop-note">' + escHtml(lp.note) + '</div>' : '')
+      + '</div>'
+      + '<span class="loop-kind-badge" style="background:'+col+'22;color:'+col+';border:1px solid '+col+'44;">'
+      +   kindBadge
+      + '</span>'
+      + '</div>';
+  }).join('');
+}
+
+// ===== イベントモーダル =====
+function openFamilyEventModal(idx){
+  familyEventEditIdx = (idx !== undefined) ? idx : -1;
+  var ev = (familyEventEditIdx >= 0) ? familyEvents[familyEventEditIdx] : null;
+  familyEventTempActions = ev ? JSON.parse(JSON.stringify(ev.actions||[])) : [];
+
+  var setVal = function(id, val){ var el=document.getElementById(id); if(el) el.value=val||''; };
+  setVal('fe-icon',       ev ? ev.icon : '');
+  setVal('fe-title',      ev ? ev.title : '');
+  setVal('fe-date-start', ev ? ev.dateStart : '');
+  setVal('fe-date-end',   ev ? ev.dateEnd : '');
+  setVal('fe-memo',       ev ? ev.memo : '');
+
+  var delBtn = document.getElementById('fe-delete-btn');
+  if(delBtn) delBtn.style.display = (familyEventEditIdx >= 0) ? 'inline-block' : 'none';
+
+  renderFamilyEventActions();
+  document.getElementById('family-event-overlay').classList.add('open');
+  setTimeout(function(){ var t=document.getElementById('fe-title'); if(t) t.focus(); }, 100);
+}
+function closeFamilyEventModal(){
+  document.getElementById('family-event-overlay').classList.remove('open');
+}
+function renderFamilyEventActions(){
+  var el = document.getElementById('fe-actions-list');
+  if(!el) return;
+  el.innerHTML = familyEventTempActions.map(function(a, i){
+    return '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">'
+      + '<input type="checkbox"' + (a.done?' checked':'') + ' onchange="familyEventTempActions['+i+'].done=this.checked">'
+      + '<span style="flex:1;font-size:12px;">' + escHtml(a.text) + '</span>'
+      + '<button class="btn btn-d btn-sm" style="padding:1px 6px;font-size:10px;" onclick="familyEventTempActions.splice('+i+',1);renderFamilyEventActions()">✕</button>'
+      + '</div>';
+  }).join('');
+}
+function addFamilyEventAction(){
+  var el = document.getElementById('fe-action-input');
+  if(!el || !el.value.trim()) return;
+  familyEventTempActions.push({text: el.value.trim(), done: false});
+  el.value = '';
+  renderFamilyEventActions();
+}
+function saveFamilyEvent(){
+  var getVal = function(id){ var el=document.getElementById(id); return el?el.value.trim():''; };
+  var title = getVal('fe-title');
+  if(!title){ showBanner('⚠️ タイトルを入力してください'); return; }
+  var ev = {
+    id:        familyEventEditIdx >= 0 ? familyEvents[familyEventEditIdx].id : familyUUID(),
+    icon:      getVal('fe-icon') || '📅',
+    title:     title,
+    dateStart: getVal('fe-date-start'),
+    dateEnd:   getVal('fe-date-end'),
+    actions:   familyEventTempActions,
+    memo:      getVal('fe-memo'),
+    created:   familyEventEditIdx >= 0 ? (familyEvents[familyEventEditIdx].created || todayStr()) : todayStr()
+  };
+  if(familyEventEditIdx >= 0) familyEvents[familyEventEditIdx] = ev;
+  else familyEvents.push(ev);
+  afterChange();
+  closeFamilyEventModal();
+  renderUpcoming();
+  showBanner('✅ イベントを保存しました');
+}
+function deleteFamilyEvent(){
+  if(familyEventEditIdx < 0) return;
+  if(!confirm('「' + familyEvents[familyEventEditIdx].title + '」を削除しますか？')) return;
+  familyEvents.splice(familyEventEditIdx, 1);
+  afterChange();
+  closeFamilyEventModal();
+  renderUpcoming();
+  showBanner('🗑 イベントを削除しました');
+}
+
+// ===== ループモーダル =====
+function openFamilyLoopModal(idx){
+  familyLoopEditIdx = (idx !== undefined) ? idx : -1;
+  var lp = (familyLoopEditIdx >= 0) ? familyLoops[familyLoopEditIdx] : null;
+  var setVal = function(id, val){ var el=document.getElementById(id); if(el) el.value=val||''; };
+  setVal('fl-title', lp ? lp.title : '');
+  setVal('fl-note',  lp ? lp.note : '');
+  var kind = lp ? lp.kind : 'thinking';
+  var radio = document.querySelector('input[name="fl-kind"][value="'+kind+'"]');
+  if(radio) radio.checked = true;
+  var delBtn = document.getElementById('fl-delete-btn');
+  if(delBtn) delBtn.style.display = (familyLoopEditIdx >= 0) ? 'inline-block' : 'none';
+  document.getElementById('family-loop-overlay').classList.add('open');
+  setTimeout(function(){ var t=document.getElementById('fl-title'); if(t) t.focus(); }, 100);
+}
+function closeFamilyLoopModal(){
+  document.getElementById('family-loop-overlay').classList.remove('open');
+}
+function saveFamilyLoop(){
+  var title = (document.getElementById('fl-title')||{value:''}).value.trim();
+  if(!title){ showBanner('⚠️ タイトルを入力してください'); return; }
+  var kind = 'thinking';
+  var radio = document.querySelector('input[name="fl-kind"]:checked');
+  if(radio) kind = radio.value;
+  var lp = {
+    id:      familyLoopEditIdx >= 0 ? familyLoops[familyLoopEditIdx].id : familyUUID(),
+    kind:    kind,
+    title:   title,
+    note:    (document.getElementById('fl-note')||{value:''}).value.trim(),
+    created: familyLoopEditIdx >= 0 ? (familyLoops[familyLoopEditIdx].created || todayStr()) : todayStr()
+  };
+  if(familyLoopEditIdx >= 0) familyLoops[familyLoopEditIdx] = lp;
+  else familyLoops.push(lp);
+  afterChange();
+  closeFamilyLoopModal();
+  renderFamilyLoops();
+  showBanner('✅ ループを保存しました');
+}
+function deleteFamilyLoop(){
+  if(familyLoopEditIdx < 0) return;
+  if(!confirm('「' + familyLoops[familyLoopEditIdx].title + '」を削除しますか？')) return;
+  familyLoops.splice(familyLoopEditIdx, 1);
+  afterChange();
+  closeFamilyLoopModal();
+  renderFamilyLoops();
+  showBanner('🗑 ループを削除しました');
+}
+
+// ===== Familyタブ全体レンダー =====
+function renderFamily(){
+  renderFamilyWeek();
+  renderUpcoming();
+  renderFamilyLoops();
+}
+
+// ===== active-filter CSS =====
 function statusLabel(s){
   var m={before_start:'構想中',before_request:'依頼前',investigate:'調査・探索',design:'設計・検討',review:'FB待ち',research:'実験・研究',wait:'外部待ち',document:'執筆・記録',process:'処理中',rework:'再検討',done:'完了',active:'進行中',risk:'要注意'};
   return m[s]||s;
