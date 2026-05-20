@@ -1087,6 +1087,29 @@ body.is-mobile .mobile-only { display: block !important; }
     <div style="font-size:10px;color:var(--text3);margin-top:6px;">💡 今週の制約・外出しやすさ・注意点など自由に記録</div>
   </div>
 
+
+  <!-- Googleカレンダー埋め込み -->
+  <div class="family-section">
+    <div class="family-section-title">
+      📆 GOOGLE CALENDAR
+      <div style="display:flex;gap:5px;">
+        <button class="btn btn-sm" id="gcal-btn-week" onclick="setGcalMode('WEEK',this)" style="background:var(--accent);color:#fff;font-size:10px;">週</button>
+        <button class="btn btn-sm" id="gcal-btn-month" onclick="setGcalMode('MONTH',this)" style="font-size:10px;">月</button>
+        <button class="btn btn-sm" id="gcal-btn-agenda" onclick="setGcalMode('AGENDA',this)" style="font-size:10px;">リスト</button>
+      </div>
+    </div>
+    <div style="border-radius:8px;overflow:hidden;border:1px solid var(--border);">
+      <iframe id="gcal-iframe"
+        src="https://calendar.google.com/calendar/embed?src=bcb55b96a78e5a163783db77444b6fc673179f5d53ddb4ba13ad9f7f8d11ac34%40group.calendar.google.com&ctz=Asia%2FTokyo&mode=WEEK&hl=ja&showTitle=0&showNav=1&showDate=1&showPrint=0&showTabs=0&showCalendars=0"
+        style="width:100%;height:520px;border:none;"
+        frameborder="0">
+      </iframe>
+    </div>
+    <div style="font-size:10px;color:var(--text3);margin-top:6px;">
+      ※ 表示されない場合はGoogleカレンダー側で「一般公開」設定が必要です
+    </div>
+  </div>
+
   <!-- ② UPCOMING -->
   <div class="family-section">
     <div class="family-section-title">
@@ -3026,6 +3049,20 @@ function deleteFamilyLoop(){
 }
 
 // ===== Familyタブ全体レンダー =====
+// ===== Googleカレンダー表示モード切替 =====
+var GCAL_BASE_SRC = 'https://calendar.google.com/calendar/embed?src=bcb55b96a78e5a163783db77444b6fc673179f5d53ddb4ba13ad9f7f8d11ac34%40group.calendar.google.com&ctz=Asia%2FTokyo&hl=ja&showTitle=0&showNav=1&showDate=1&showPrint=0&showTabs=0&showCalendars=0&mode=';
+
+function setGcalMode(mode, btn){
+  var iframe = document.getElementById('gcal-iframe');
+  if(iframe) iframe.src = GCAL_BASE_SRC + mode;
+  // ボタンのアクティブ状態
+  ['week','month','agenda'].forEach(function(m){
+    var b = document.getElementById('gcal-btn-'+m);
+    if(b){ b.style.background=''; b.style.color=''; }
+  });
+  if(btn){ btn.style.background='var(--accent)'; btn.style.color='#fff'; }
+}
+
 function renderFamily(){
   renderFamilyWeek();
   renderUpcoming();
@@ -3121,11 +3158,31 @@ async function analyzeScreenshot(){
   if(loading) loading.style.display = 'block';
   if(result)  result.style.display  = 'none';
 
-  // モード別プロンプト
-  var basePrompt = 'カレンダーのスクリーンショットです。予定をJSON形式だけで返してください。説明文・コードブロック不要。';
-  var promptWeek   = basePrompt + '形式: {"weekNote":"月曜: 内容\n火曜: 内容\n..."}';
-  var promptEvents = basePrompt + '形式: {"events":[{"icon":"絵文字","title":"名前","dateStart":"YYYY-MM-DD","dateEnd":"YYYY-MM-DD","memo":"メモ"}]}';
-  var promptBoth   = basePrompt + '形式: {"weekNote":"今週の予定","events":[{"icon":"絵文字","title":"名前","dateStart":"YYYY-MM-DD","dateEnd":"YYYY-MM-DD","memo":"メモ"}]}';
+
+  // モード別プロンプト（今日の日付をGPTに渡して正確な週判定を行う）
+  var todayForPrompt = todayStr();
+  var d0 = new Date();
+  var dayNames0 = ['日','月','火','水','木','金','土'];
+  var todayJa = d0.getFullYear()+'年'+(d0.getMonth()+1)+'月'+d0.getDate()+'日（'+dayNames0[d0.getDay()]+'）';
+
+  var base = 'これはTimeTreeの月間カレンダーのスクリーンショットです。今日は'+todayJa+'（'+todayForPrompt+'）です。'
+    + '画像内の各日付マスに書かれたテキストをそのまま正確に読み取ってください。推測・補完は禁止。'
+    + '返答はJSONのみ。```や説明文は一切不要。';
+
+  var promptWeek = base
+    + '今日('+todayForPrompt+')を含む週（月〜日）の予定を読み取り、日付付きで返してください。'
+    + '形式: {"weekNote":"5/18(月): 予定1, 予定2\n5/19(火): 予定1\n5/20(水): なし\n5/21(木): 予定1\n5/22(金): 予定1\n5/23(土): 予定1\n5/24(日): 予定1"}';
+
+  var promptEvents = base
+    + '今日('+todayForPrompt+')以降の予定・イベントを日付付きで読み取ってください。'
+    + '日付はカレンダーから正確に読み取りYYYY-MM-DD形式で。'
+    + '形式: {"events":[{"icon":"📅","title":"予定名","dateStart":"YYYY-MM-DD","dateEnd":"YYYY-MM-DD","memo":"時刻や詳細"}]}';
+
+  var promptBoth = base
+    + '(1)今日('+todayForPrompt+')を含む週の予定と(2)今日以降の注目イベントを返してください。'
+    + '日付はカレンダーから正確に読み取ること。'
+    + '形式: {"weekNote":"5/18(月): 内容\n5/19(火): 内容\n...","events":[{"icon":"📅","title":"予定名","dateStart":"YYYY-MM-DD","memo":"詳細"}]}';
+
   var prompts = {week: promptWeek, events: promptEvents, both: promptBoth};
 
   var prompt = prompts[mode] || prompts['week'];
