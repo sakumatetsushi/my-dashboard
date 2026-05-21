@@ -1105,27 +1105,6 @@ body:not(.pw-unlocked) nav button.locked-tab{
     </div>
   </div>
 
-  <!-- ① TODAY / THIS WEEK -->
-  <div class="family-section">
-    <div class="family-section-title">
-      📅 TODAY / THIS WEEK
-      <span id="family-week-label"></span>
-    </div>
-    <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
-      <button class="btn btn-g btn-sm" onclick="shiftFamilyWeek(-1)">← 先週</button>
-      <button class="btn btn-p btn-sm" onclick="shiftFamilyWeek(0)">今週</button>
-      <button class="btn btn-g btn-sm" onclick="shiftFamilyWeek(1)">来週 →</button>
-    </div>
-    <div
-      id="family-week-note"
-      class="week-note-area"
-      contenteditable="true"
-      placeholder="今週の制約・注意点・予定メモ（自由に入力）"
-      oninput="saveFamilyWeekNote()"
-    ></div>
-    <div style="font-size:10px;color:var(--text3);margin-top:6px;">💡 今週の制約・外出しやすさ・注意点など自由に記録</div>
-  </div>
-
 
   <!-- Googleカレンダー埋め込み -->
   <div class="family-section">
@@ -1158,6 +1137,32 @@ body:not(.pw-unlocked) nav button.locked-tab{
         <button id="btn-fetch-gcal" class="btn btn-sm" style="background:var(--success);color:#fff;font-size:10px;" onclick="fetchGcalToUpcoming()">🔄 カレンダー同期</button>
       </div>
     </div>
+
+    <!-- 期間指定イベント検索 -->
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:10px;">
+      <div style="font-size:10px;font-weight:700;color:var(--accent);letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px;">🔍 期間指定でGoogleカレンダーを検索</div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <label style="font-size:11px;color:var(--text3);display:flex;flex-direction:column;gap:3px;">
+          開始日<input type="date" id="gcal-search-start" style="font-size:12px;padding:4px 6px;">
+        </label>
+        <span style="color:var(--text3);font-size:12px;align-self:flex-end;padding-bottom:4px;">〜</span>
+        <label style="font-size:11px;color:var(--text3);display:flex;flex-direction:column;gap:3px;">
+          終了日<input type="date" id="gcal-search-end" style="font-size:12px;padding:4px 6px;">
+        </label>
+        <button class="btn btn-p btn-sm" onclick="searchGcalRange()" style="align-self:flex-end;min-height:32px;">🔍 検索</button>
+        <button class="btn btn-g btn-sm" onclick="setGcalSearchPreset('week',this)" style="align-self:flex-end;font-size:10px;">今週</button>
+        <button class="btn btn-g btn-sm" onclick="setGcalSearchPreset('month',this)" style="align-self:flex-end;font-size:10px;">今月</button>
+        <button class="btn btn-g btn-sm" onclick="setGcalSearchPreset('3m',this)" style="align-self:flex-end;font-size:10px;">3ヶ月</button>
+      </div>
+      <!-- 検索結果 -->
+      <div id="gcal-search-result" style="display:none;margin-top:10px;">
+        <div style="font-size:10px;color:var(--text3);margin-bottom:6px;" id="gcal-search-label"></div>
+        <div id="gcal-search-list" style="max-height:260px;overflow-y:auto;"></div>
+        <button class="btn btn-s btn-sm" style="width:100%;margin-top:8px;" onclick="addGcalSearchResultsToUpcoming()">✅ 選択したイベントをUPCOMINGに追加</button>
+      </div>
+      <div id="gcal-search-loading" style="display:none;text-align:center;padding:10px;font-size:12px;color:var(--text2);">⏳ 検索中...</div>
+    </div>
+
     <div id="upcoming-filter" style="display:flex;gap:5px;margin-bottom:10px;flex-wrap:wrap;">
       <button class="btn btn-sm active-filter" onclick="setUpcomingFilter('all',this)">すべて</button>
       <button class="btn btn-sm" onclick="setUpcomingFilter('1m',this)">1ヶ月以内</button>
@@ -1181,74 +1186,6 @@ body:not(.pw-unlocked) nav button.locked-tab{
     </div>
     <div id="loop-list"></div>
     <button class="btn btn-g btn-sm" style="width:100%;margin-top:6px;" onclick="openFamilyLoopModal()">＋ 新しいループを追加</button>
-  </div>
-
-  <!-- ④ スクショ読み込み（GPT Vision） -->
-  <div class="family-section">
-    <div class="family-section-title">
-      📷 スクショ読み込み
-      <span style="font-size:10px;color:var(--text3);">TimeTreeなどの予定画像 → 自動解析</span>
-    </div>
-
-    <!-- APIキー設定（折りたたみ） -->
-    <details style="margin-bottom:10px;">
-      <summary style="font-size:11px;color:var(--text3);cursor:pointer;user-select:none;">
-        ⚙️ GPT APIキー設定
-      </summary>
-      <div style="margin-top:8px;display:flex;gap:8px;align-items:center;">
-        <input type="password" id="gpt-api-key-input"
-          placeholder="sk-proj-..."
-          style="flex:1;font-size:11px;"
-          value="">
-        <button class="btn btn-s btn-sm" onclick="applyGptApiKey()">保存</button>
-        <button class="btn btn-d btn-sm" onclick="clearGptApiKey()">削除</button>
-      </div>
-      <div id="gpt-key-status" style="font-size:10px;margin-top:4px;color:var(--text3);"></div>
-    </details>
-
-    <!-- ドロップゾーン -->
-    <div id="screenshot-drop-zone"
-      style="border:2px dashed var(--border);border-radius:10px;padding:24px;text-align:center;cursor:pointer;transition:all .2s;background:var(--surface2);"
-      onclick="document.getElementById('screenshot-file-input').click()"
-      ondragover="event.preventDefault();this.style.borderColor='var(--accent2)';this.style.background='var(--surface3)';"
-      ondragleave="this.style.borderColor='var(--border)';this.style.background='var(--surface2)';"
-      ondrop="handleScreenshotDrop(event)">
-      <div style="font-size:28px;margin-bottom:8px;">📷</div>
-      <div style="font-size:13px;font-weight:600;color:var(--text2);">画像をドロップ または クリックして選択</div>
-      <div style="font-size:11px;color:var(--text3);margin-top:4px;">TimeTree・Googleカレンダー等のスクショをそのまま</div>
-    </div>
-    <input type="file" id="screenshot-file-input" accept="image/*" style="display:none;" onchange="handleScreenshotFile(this)">
-
-    <!-- プレビュー -->
-    <div id="screenshot-preview" style="display:none;margin-top:10px;">
-      <img id="screenshot-img" style="max-width:100%;border-radius:8px;border:1px solid var(--border);">
-      <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
-        <select id="screenshot-mode" style="flex:1;font-size:12px;">
-          <option value="week">今週の予定を読み取る（TODAY/THIS WEEK）</option>
-          <option value="events">イベント・長期予定を読み取る（UPCOMING）</option>
-          <option value="both">両方読み取る</option>
-        </select>
-        <button class="btn btn-sm" style="background:linear-gradient(135deg,#10a37f,#00d4aa);color:#fff;min-height:36px;padding:6px 16px;"
-          onclick="analyzeScreenshot()">🤖 GPTで解析</button>
-        <button class="btn btn-g btn-sm" onclick="clearScreenshot()">✕ クリア</button>
-      </div>
-    </div>
-
-    <!-- 解析結果 -->
-    <div id="screenshot-result" style="display:none;margin-top:10px;">
-      <div style="font-size:10px;color:var(--text3);font-weight:700;letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px;">📋 解析結果</div>
-      <div id="screenshot-result-content" style="background:var(--surface2);border-radius:8px;padding:12px;font-size:12px;border:1px solid var(--border);max-height:280px;overflow-y:auto;"></div>
-      <div style="display:flex;gap:8px;margin-top:8px;">
-        <button class="btn btn-s" onclick="applyScreenshotResult()" style="flex:1;">✅ FAMILYに反映する</button>
-        <button class="btn btn-g btn-sm" onclick="document.getElementById('screenshot-result').style.display='none';">キャンセル</button>
-      </div>
-    </div>
-
-    <!-- ローディング -->
-    <div id="screenshot-loading" style="display:none;text-align:center;padding:16px;color:var(--text2);font-size:12px;">
-      <div style="font-size:20px;animation:spin 1s linear infinite;display:inline-block;">⏳</div>
-      <div style="margin-top:6px;">GPTが画像を解析中...</div>
-    </div>
   </div>
 
 
@@ -3624,6 +3561,130 @@ function sendFamilyToAI(type, idx, aiId, selectId){
     window.open(ai.url,'_blank');
   });
 }
+// ===== Google Calendar 期間指定検索 =====
+var gcalSearchResults = []; // 検索結果を保持
+
+function setGcalSearchPreset(preset, btn){
+  var now = new Date();
+  var start, end;
+  if(preset === 'week'){
+    var day = now.getDay();
+    start = new Date(now); start.setDate(now.getDate() - (day===0?6:day-1));
+    end   = new Date(start); end.setDate(start.getDate() + 6);
+  } else if(preset === 'month'){
+    start = new Date(now.getFullYear(), now.getMonth(), 1);
+    end   = new Date(now.getFullYear(), now.getMonth()+1, 0);
+  } else if(preset === '3m'){
+    start = new Date(now);
+    end   = new Date(now); end.setMonth(end.getMonth()+3);
+  }
+  var fmt = function(d){ return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2); };
+  var s = document.getElementById('gcal-search-start');
+  var e = document.getElementById('gcal-search-end');
+  if(s) s.value = fmt(start);
+  if(e) e.value = fmt(end);
+}
+
+async function searchGcalRange(){
+  var startVal = (document.getElementById('gcal-search-start')||{value:''}).value;
+  var endVal   = (document.getElementById('gcal-search-end')||{value:''}).value;
+  if(!startVal || !endVal){ showBanner('⚠️ 開始日と終了日を入力してください'); return; }
+  if(startVal > endVal){ showBanner('⚠️ 開始日が終了日より後になっています'); return; }
+
+  var loading = document.getElementById('gcal-search-loading');
+  var result  = document.getElementById('gcal-search-result');
+  if(loading) loading.style.display = 'block';
+  if(result)  result.style.display  = 'none';
+  gcalSearchResults = [];
+
+  try{
+    var proxyUrl = GCAL_PROXY + encodeURIComponent(GCAL_ICAL_URL);
+    var res = await fetch(proxyUrl);
+    if(!res.ok) throw new Error('取得失敗: '+res.status);
+    var data = await res.json();
+    var events = parseICS(data.contents || '');
+
+    // 期間フィルタ
+    gcalSearchResults = events.filter(function(ev){
+      if(!ev.dateStart) return false;
+      return ev.dateStart >= startVal && ev.dateStart <= endVal;
+    }).sort(function(a,b){ return a.dateStart < b.dateStart ? -1 : 1; });
+
+    renderGcalSearchResult(startVal, endVal);
+  } catch(e){
+    showBanner('⚠️ 検索失敗: ' + e.message);
+    console.error('searchGcalRange:', e);
+  } finally {
+    if(loading) loading.style.display = 'none';
+  }
+}
+
+function renderGcalSearchResult(startVal, endVal){
+  var result  = document.getElementById('gcal-search-result');
+  var label   = document.getElementById('gcal-search-label');
+  var listEl  = document.getElementById('gcal-search-list');
+  if(!result || !listEl) return;
+
+  if(label) label.textContent = startVal + ' 〜 ' + endVal + '：' + gcalSearchResults.length + '件';
+
+  if(!gcalSearchResults.length){
+    listEl.innerHTML = '<div class="empty">この期間にイベントはありません</div>';
+    result.style.display = 'block';
+    return;
+  }
+
+  listEl.innerHTML = gcalSearchResults.map(function(ev, i){
+    // 既にUPCOMINGに同日・同タイトルのものがあるか
+    var dup = familyEvents.some(function(fe){
+      return fe.title === ev.title && fe.dateStart === ev.dateStart;
+    });
+    return '<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;'
+      +'background:var(--surface);border-radius:6px;margin-bottom:4px;border:1px solid var(--border);">'
+      +'<input type="checkbox" id="gcal-sr-'+i+'" '+(dup?'disabled title="既にUPCOMINGに追加済"':'')+' style="accent-color:var(--accent2);">'
+      +'<div style="flex:1;min-width:0;">'
+      +'<div style="font-size:12px;font-weight:600;'+(dup?'opacity:.45;':'')+'">📅 '+escHtml(ev.title)+'</div>'
+      +'<div style="font-size:10px;color:var(--text3);">'+ev.dateStart+(ev.dateEnd&&ev.dateEnd!==ev.dateStart?' 〜 '+ev.dateEnd:'')+'</div>'
+      +'</div>'
+      +(dup?'<span style="font-size:9px;color:var(--text3);">追加済</span>':'')
+      +'</div>';
+  }).join('');
+
+  result.style.display = 'block';
+}
+
+function addGcalSearchResultsToUpcoming(){
+  var added = 0;
+  gcalSearchResults.forEach(function(ev, i){
+    var cb = document.getElementById('gcal-sr-'+i);
+    if(!cb || !cb.checked || cb.disabled) return;
+    var dup = familyEvents.some(function(fe){ return fe.title===ev.title && fe.dateStart===ev.dateStart; });
+    if(dup) return;
+    familyEvents.push({
+      id:        familyUUID(),
+      icon:      '📅',
+      title:     ev.title,
+      dateStart: ev.dateStart,
+      dateEnd:   ev.dateEnd || ev.dateStart,
+      actions:   [],
+      memo:      ev.memo || '',
+      source:    'gcal',
+      created:   todayStr()
+    });
+    added++;
+  });
+  if(added > 0){
+    afterChange();
+    renderUpcoming();
+    // チェックボックスを更新（追加済みに）
+    var startVal = (document.getElementById('gcal-search-start')||{value:''}).value;
+    var endVal   = (document.getElementById('gcal-search-end')||{value:''}).value;
+    renderGcalSearchResult(startVal, endVal);
+    showBanner('✅ '+added+'件をUPCOMINGに追加しました');
+  } else {
+    showBanner('⚠️ チェックされたイベントがありません');
+  }
+}
+
 function statusLabel(s){
   var m={before_start:'構想中',before_request:'依頼前',investigate:'調査・探索',design:'設計・検討',review:'FB待ち',research:'実験・研究',wait:'外部待ち',document:'執筆・記録',process:'処理中',rework:'再検討',done:'完了',active:'進行中',risk:'要注意'};
   return m[s]||s;
