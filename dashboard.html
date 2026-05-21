@@ -1188,6 +1188,66 @@ body:not(.pw-unlocked) nav button.locked-tab{
     <button class="btn btn-g btn-sm" style="width:100%;margin-top:6px;" onclick="openFamilyLoopModal()">＋ 新しいループを追加</button>
   </div>
 
+  <!-- ④ 地域イベント検索 -->
+  <div class="family-section">
+    <div class="family-section-title">
+      🔍 地域イベント検索
+      <span style="font-size:10px;color:var(--text3);">GPT提案 + Web検索</span>
+    </div>
+
+    <!-- 検索条件 -->
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+      <label style="font-size:11px;color:var(--text3);display:flex;flex-direction:column;gap:3px;flex:1;min-width:120px;">
+        地域・エリア
+        <input type="text" id="ev-search-area" placeholder="例: 大阪市、天王寺区" style="font-size:12px;">
+      </label>
+      <label style="font-size:11px;color:var(--text3);display:flex;flex-direction:column;gap:3px;min-width:100px;">
+        期間
+        <input type="text" id="ev-search-period" placeholder="例: 6月〜7月" style="font-size:12px;">
+      </label>
+      <label style="font-size:11px;color:var(--text3);display:flex;flex-direction:column;gap:3px;flex:1;min-width:140px;">
+        キーワード（任意）
+        <input type="text" id="ev-search-keyword" placeholder="例: 子ども向け、無料、公園" style="font-size:12px;">
+      </label>
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">
+      <button class="btn btn-sm" style="background:linear-gradient(135deg,#10a37f,#00d4aa);color:#fff;" onclick="searchLocalEventsGPT()">🤖 GPTに提案させる</button>
+      <button class="btn btn-sm" style="background:linear-gradient(135deg,#1e3a8a,#4f8ef7);color:#fff;" id="btn-web-search" onclick="searchLocalEventsWeb()">🌐 Web検索</button>
+    </div>
+
+    <!-- ローディング -->
+    <div id="ev-search-loading" style="display:none;text-align:center;padding:12px;font-size:12px;color:var(--text2);">
+      <div style="font-size:20px;display:inline-block;animation:spin 1s linear infinite;">⏳</div>
+      <div style="margin-top:4px;" id="ev-search-loading-msg">検索中...</div>
+    </div>
+
+    <!-- 結果エリア -->
+    <div id="ev-search-result" style="display:none;">
+      <div style="font-size:10px;color:var(--text3);font-weight:700;letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px;" id="ev-search-result-label"></div>
+      <div id="ev-search-result-content" style="background:var(--surface2);border-radius:8px;padding:12px;font-size:12px;border:1px solid var(--border);max-height:360px;overflow-y:auto;white-space:pre-wrap;line-height:1.7;color:var(--text2);"></div>
+      <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;">
+        <button class="btn btn-sm" style="background:var(--accent2);color:#fff;" onclick="addEvSearchResultAsLoop()">🔄 Open Loopに追加</button>
+        <button class="btn btn-g btn-sm" onclick="document.getElementById('ev-search-result').style.display='none';">閉じる</button>
+      </div>
+    </div>
+
+    <!-- Google検索API設定（折りたたみ） -->
+    <details style="margin-top:10px;">
+      <summary style="font-size:11px;color:var(--text3);cursor:pointer;user-select:none;">⚙️ Google検索API設定（Web検索用）</summary>
+      <div style="margin-top:8px;display:flex;flex-direction:column;gap:6px;">
+        <div style="display:flex;gap:6px;align-items:center;">
+          <label style="font-size:11px;color:var(--text3);min-width:100px;">APIキー</label>
+          <input type="password" id="gcs-api-key" placeholder="AIzaSy..." style="flex:1;font-size:11px;">
+        </div>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <label style="font-size:11px;color:var(--text3);min-width:100px;">検索エンジンID</label>
+          <input type="text" id="gcs-cx" placeholder="cx値" style="flex:1;font-size:11px;">
+        </div>
+        <button class="btn btn-s btn-sm" onclick="saveGcsSettings()">保存</button>
+        <div id="gcs-status" style="font-size:10px;color:var(--text3);"></div>
+      </div>
+    </details>
+  </div>
 
 </div>
 
@@ -3683,6 +3743,218 @@ function addGcalSearchResultsToUpcoming(){
   } else {
     showBanner('⚠️ チェックされたイベントがありません');
   }
+}
+
+// ===== 地域イベント検索 =====
+var lastEvSearchResult = '';
+
+function getGcsSettings(){
+  return {
+    apiKey: localStorage.getItem('gcs_api_key') || '',
+    cx:     localStorage.getItem('gcs_cx') || ''
+  };
+}
+function saveGcsSettings(){
+  var key = (document.getElementById('gcs-api-key')||{value:''}).value.trim();
+  var cx  = (document.getElementById('gcs-cx')||{value:''}).value.trim();
+  if(key) localStorage.setItem('gcs_api_key', key);
+  if(cx)  localStorage.setItem('gcs_cx', cx);
+  updateGcsStatus();
+  showBanner('✅ Google検索API設定を保存しました');
+}
+function updateGcsStatus(){
+  var el = document.getElementById('gcs-status');
+  if(!el) return;
+  var s = getGcsSettings();
+  el.textContent = s.apiKey && s.cx
+    ? '✅ APIキー・検索エンジンID設定済み'
+    : '未設定（APIキーと検索エンジンIDが必要です）';
+  el.style.color = s.apiKey && s.cx ? 'var(--success)' : 'var(--text3)';
+}
+
+function getEvSearchParams(){
+  var area    = (document.getElementById('ev-search-area')||{value:''}).value.trim();
+  var period  = (document.getElementById('ev-search-period')||{value:''}).value.trim();
+  var keyword = (document.getElementById('ev-search-keyword')||{value:''}).value.trim();
+  if(!area){ showBanner('⚠️ 地域・エリアを入力してください'); return null; }
+  return {area:area, period:period, keyword:keyword};
+}
+
+function showEvSearchLoading(msg){
+  var el = document.getElementById('ev-search-loading');
+  var ml = document.getElementById('ev-search-loading-msg');
+  var rs = document.getElementById('ev-search-result');
+  if(el) el.style.display = 'block';
+  if(ml) ml.textContent = msg || '検索中...';
+  if(rs) rs.style.display = 'none';
+}
+function hideEvSearchLoading(){ 
+  var el = document.getElementById('ev-search-loading');
+  if(el) el.style.display = 'none';
+}
+function showEvSearchResult(label, content){
+  lastEvSearchResult = content;
+  var el  = document.getElementById('ev-search-result');
+  var lbl = document.getElementById('ev-search-result-label');
+  var cnt = document.getElementById('ev-search-result-content');
+  if(lbl) lbl.textContent = label;
+  if(cnt) cnt.textContent = content;
+  if(el)  el.style.display = 'block';
+}
+
+/** GPTに地域イベントを提案させる */
+async function searchLocalEventsGPT(){
+  var p = getEvSearchParams();
+  if(!p) return;
+  var apiKey = getGptApiKey();
+  if(!apiKey){ showBanner('⚠️ GPT APIキーが未設定です（UPCOMINGの検索欄 → ⚙️設定）'); return; }
+
+  showEvSearchLoading('GPTが地域イベントを提案中...');
+
+  var prompt = [
+    '以下の条件で、家族向けのおでかけ・イベントを提案してください。',
+    '地域: '+p.area,
+    p.period  ? '期間: '+p.period   : '',
+    p.keyword ? 'キーワード: '+p.keyword : '',
+    '',
+    '以下の形式でまとめてください:',
+    '・各イベントの名称、概要、おすすめポイント（子ども向けかどうか含む）',
+    '・無料/有料の別（わかれば）',
+    '・開催時期の目安',
+    '',
+    '注意: AIの学習データに基づく提案のため、最新情報はWeb検索で確認してください。',
+    '10件程度提案してください。'
+  ].filter(Boolean).join('\n');
+
+  try{
+    var res = await fetch(GPT_API_URL, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json','Authorization':'Bearer '+apiKey},
+      body: JSON.stringify({
+        model: GPT_MODEL,
+        max_tokens: 1500,
+        messages: [{role:'user', content: prompt}]
+      })
+    });
+    if(!res.ok){ var e=await res.json(); throw new Error(e.error?e.error.message:'APIエラー'); }
+    var data = await res.json();
+    var text = data.choices[0].message.content.trim();
+    showEvSearchResult(
+      '🤖 GPT提案: '+p.area+(p.period?' / '+p.period:''),
+      text
+    );
+  } catch(e){
+    showBanner('⚠️ GPT検索エラー: '+e.message);
+    console.error(e);
+  } finally {
+    hideEvSearchLoading();
+  }
+}
+
+/** Google Custom Search APIでWeb検索 */
+async function searchLocalEventsWeb(){
+  var p = getEvSearchParams();
+  if(!p) return;
+  var s = getGcsSettings();
+  if(!s.apiKey || !s.cx){
+    showBanner('⚠️ Google検索APIが未設定です（⚙️ Google検索API設定を開く）');
+    return;
+  }
+
+  showEvSearchLoading('Webを検索中...');
+
+  var query = p.area + ' イベント';
+  if(p.period)  query += ' ' + p.period;
+  if(p.keyword) query += ' ' + p.keyword;
+  query += ' おでかけ 子ども';
+
+  try{
+    var url = 'https://www.googleapis.com/customsearch/v1'
+      + '?key=' + encodeURIComponent(s.apiKey)
+      + '&cx='  + encodeURIComponent(s.cx)
+      + '&q='   + encodeURIComponent(query)
+      + '&num=10&hl=ja&gl=jp';
+
+    var res = await fetch(url);
+    if(!res.ok){ var e=await res.json(); throw new Error(e.error?e.error.message:'APIエラー'); }
+    var data = await res.json();
+    var items = data.items || [];
+
+    if(!items.length){
+      showEvSearchResult('🌐 検索結果: '+query, '結果が見つかりませんでした。キーワードを変えて試してください。');
+      return;
+    }
+
+    var text = items.map(function(item, i){
+      return (i+1)+'. 【'+item.title+'】\n'
+        + (item.snippet||'').replace(/\n/g,' ') + '\n'
+        + '🔗 '+item.link;
+    }).join('\n\n');
+
+    showEvSearchResult('🌐 Web検索結果: '+query+'（'+items.length+'件）', text);
+
+    // GPTにも連携して整理させる
+    if(getGptApiKey()){
+      await summarizeWebResults(query, items);
+    }
+
+  } catch(e){
+    showBanner('⚠️ Web検索エラー: '+e.message);
+    console.error(e);
+  } finally {
+    hideEvSearchLoading();
+  }
+}
+
+/** Web検索結果をGPTで整理 */
+async function summarizeWebResults(query, items){
+  var apiKey = getGptApiKey();
+  if(!apiKey || !items.length) return;
+
+  var raw = items.map(function(it,i){
+    return (i+1)+'. '+it.title+'\n'+it.snippet;
+  }).join('\n\n');
+
+  var prompt = '以下のWeb検索結果を、家族向けおでかけ・イベント情報として整理してください。\n'
+    + '検索クエリ: '+query+'\n\n'
+    + raw + '\n\n'
+    + '各イベントを簡潔にまとめ、子ども向けかどうか・無料/有料・おすすめポイントを箇条書きで整理してください。';
+
+  try{
+    var res = await fetch(GPT_API_URL, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json','Authorization':'Bearer '+apiKey},
+      body: JSON.stringify({model:GPT_MODEL, max_tokens:1200, messages:[{role:'user',content:prompt}]})
+    });
+    if(!res.ok) return;
+    var data = await res.json();
+    var summary = data.choices[0].message.content.trim();
+    // 既存の結果の下にGPT整理を追加
+    var cnt = document.getElementById('ev-search-result-content');
+    if(cnt){
+      var combined = cnt.textContent + '\n\n━━━━━ GPTによる整理 ━━━━━\n\n' + summary;
+      cnt.textContent = combined;
+      lastEvSearchResult = combined;
+    }
+  } catch(e){ console.warn('summarizeWebResults:', e); }
+}
+
+/** 検索結果をOpen Loopに追加 */
+function addEvSearchResultAsLoop(){
+  var area = (document.getElementById('ev-search-area')||{value:''}).value.trim();
+  var period = (document.getElementById('ev-search-period')||{value:''}).value.trim();
+  var title = '📍 '+area+(period?' '+period:'')+'のイベント候補';
+  familyLoops.push({
+    id:      familyUUID(),
+    kind:    'idea',
+    title:   title,
+    note:    lastEvSearchResult.slice(0, 400) + (lastEvSearchResult.length > 400 ? '...' : ''),
+    userMemo: lastEvSearchResult,
+    created: todayStr()
+  });
+  afterChange();
+  renderFamilyLoops();
+  showBanner('🔄 Open Loopに追加しました');
 }
 
 function statusLabel(s){
