@@ -2747,12 +2747,12 @@ var GPT_API_KEY = localStorage.getItem('gpt_api_key') || '';
 var GPT_MODEL   = 'gpt-4o';
 
 // ===== Gemini API =====
-var GEMINI_API_KEY  = localStorage.getItem('gemini_api_key') || 'AIzaSyA9TDhF9YLmLcGvLJ-5jE9USrk5mjcTkQU';
-var GEMINI_MODEL    = 'gemini-2.0-flash';
+var GEMINI_API_KEY  = localStorage.getItem('gemini_api_key') || '';
+var GEMINI_MODEL    = 'gemini-1.5-flash';
 var GEMINI_API_URL  = 'https://generativelanguage.googleapis.com/v1beta/models/'+GEMINI_MODEL+':generateContent?key=';
 
 function getGeminiApiKey(){
-  return localStorage.getItem('gemini_api_key') || 'AIzaSyA9TDhF9YLmLcGvLJ-5jE9USrk5mjcTkQU';
+  return localStorage.getItem('gemini_api_key') || '';
 }
 function saveGeminiApiKey(key){
   GEMINI_API_KEY = key;
