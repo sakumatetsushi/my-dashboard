@@ -642,6 +642,46 @@ body.is-mobile .mobile-only { display: block !important; }
 /* Family モーダル共通 */
 .family-modal-section{margin-bottom:14px;}
 .family-modal-section label{font-size:11px;color:var(--text3);display:block;margin-bottom:4px;font-weight:700;letter-spacing:.04em;}
+
+
+/* カードインライン展開 */
+.family-card-memo{
+  margin-top:8px;padding-top:8px;
+  border-top:1px solid var(--border);
+  display:none;
+}
+.family-card-memo.open{ display:block; }
+.family-card-memo textarea{
+  width:100%;font-size:11px;min-height:52px;resize:vertical;
+  background:var(--surface3);color:var(--text);border:1px solid var(--border);
+  border-radius:6px;padding:6px;
+}
+.family-ai-row{
+  display:flex;gap:5px;margin-top:6px;flex-wrap:wrap;align-items:center;
+}
+.family-ai-row select{font-size:10px;padding:2px 4px;min-height:28px;flex:1;min-width:80px;}
+
+/* ===== パスワード認証 ===== */
+#pw-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.92);
+  z-index:9998;display:flex;align-items:center;justify-content:center;
+  backdrop-filter:blur(8px);
+}
+#pw-box{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:14px;padding:32px 40px;text-align:center;
+  max-width:380px;width:90%;
+}
+#pw-box h2{
+  font-size:16px;margin-bottom:6px;
+  background:linear-gradient(90deg,var(--accent),var(--accent2));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  background-clip:text;
+}
+/* 認証済みでないタブボタンを薄く */
+body:not(.pw-unlocked) nav button.locked-tab{
+  opacity:.35;pointer-events:none;
+}
 </style>
 </head>
 <body>
@@ -652,14 +692,13 @@ body.is-mobile .mobile-only { display: block !important; }
 </header>
 
 <nav id="mainnav">
-  <button class="active" onclick="showTab('overview',this)">📊 概要</button>
-  <button onclick="showTab('inbox',this)">📥 案件ログ</button>
-  <button onclick="showTab('tasks',this)">📋 タスク管理</button>
-  <button onclick="showTab('gantt',this)">📊 ガント</button>
+  <button class="active locked-tab" onclick="showTab('overview',this)">📊 概要</button>
+  <button class="locked-tab" onclick="showTab('inbox',this)">📥 案件ログ</button>
+  <button class="locked-tab" onclick="showTab('tasks',this)">📋 タスク管理</button>
+  <button class="locked-tab" onclick="showTab('gantt',this)">📊 ガント</button>
   <button onclick="showTab('family',this)">🏠 Family</button>
-  <button onclick="showTab('note',this)">📓 ノート</button>
-  <button onclick="showTab('recent',this)">📂 最近のファイル（🚧工事中）</button>
-  <button onclick="showTab('copilot',this)">🤖 AI</button>
+  <button class="locked-tab" onclick="showTab('note',this)">📓 ノート</button>
+  <button class="locked-tab" onclick="showTab('copilot',this)">🤖 AI</button>
 </nav>
 
 <div id="fs-bar">
@@ -1114,7 +1153,10 @@ body.is-mobile .mobile-only { display: block !important; }
   <div class="family-section">
     <div class="family-section-title">
       🗓 UPCOMING — 今後のイベントと準備
-      <span style="font-size:10px;color:var(--text3);" id="upcoming-count"></span>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-size:10px;color:var(--text3);" id="upcoming-count"></span>
+        <button id="btn-fetch-gcal" class="btn btn-sm" style="background:var(--success);color:#fff;font-size:10px;" onclick="fetchGcalToUpcoming()">🔄 カレンダー同期</button>
+      </div>
     </div>
     <div id="upcoming-filter" style="display:flex;gap:5px;margin-bottom:10px;flex-wrap:wrap;">
       <button class="btn btn-sm active-filter" onclick="setUpcomingFilter('all',this)">すべて</button>
@@ -1287,24 +1329,7 @@ body.is-mobile .mobile-only { display: block !important; }
   </div>
 </div>
 <!-- 最近のファイル -->
-<div id="tab-recent" class="tab container">
-  <div class="card">
-    <h2>📂 最近使ったファイル（過去1日）</h2>
-    <p style="font-size:11px;color:#888;margin-bottom:10px;">
-      ① 「スクリプト生成」を押して2ファイルをダウンロード →
-      ② ダッシュボードと<strong>同じフォルダ</strong>に保存 →
-      ③ <strong>run_recent.bat</strong> をダブルクリック実行 →
-      ④ 「読み込み」ボタンでリスト表示
-    </p>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
-      <button class="btn btn-p" onclick="downloadRecentScript()">① スクリプト生成・ダウンロード</button>
-      <button class="btn btn-s" onclick="loadRecentFiles()">② 読み込み（実行後）</button>
-      <button class="btn btn-g" onclick="clearRecentFiles()">リストをクリア</button>
-    </div>
-    <div id="recent-status" style="font-size:11px;color:#2980b9;margin-bottom:8px;font-weight:700;"></div>
-    <div id="recent-list"></div>
-  </div>
-</div>
+
 <!-- AI ハブ -->
 <div id="tab-copilot" class="tab container">
   <!-- エージェント・リンク -->
@@ -2873,12 +2898,18 @@ function renderUpcoming(){
       +   '</div>'
       +   '<div class="ev-date">' + escHtml(dateLabel) + '</div>'
       +   (actionHtml ? '<div class="ev-next-actions">' + actionHtml + '</div>' : '')
-      +   (ev.memo ? '<div style="font-size:10px;color:var(--text3);margin-top:4px;">📝 ' + escHtml(ev.memo) + '</div>' : '')
       + '</div>'
-      + '<div style="display:flex;flex-direction:column;align-items:center;gap:4px;">'
+      + '<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex-shrink:0;">'
       +   '<div class="ev-progress">' + (actions.length ? pct + '%' : '') + '</div>'
-      +   '<button class="btn btn-g btn-sm" onclick="openFamilyEventModal('+idx+')" style="font-size:10px;padding:2px 6px;">編集</button>'
+      +   '<button class="btn btn-g btn-sm" onclick="openFamilyEventModal('+idx+')" style="font-size:10px;padding:2px 6px;">✏️ 編集</button>'
+      +   '<button class="btn btn-sm" data-memoid="ev-memo-'+idx+'" onclick="toggleFamilyCardMemo(this.dataset.memoid)" style="font-size:10px;padding:2px 6px;background:var(--surface3);color:var(--text2);" title="メモ・AI">💬</button>'
+      +   '<button class="btn btn-sm" onclick="addLoopFromEvent('+idx+')" style="font-size:10px;padding:2px 6px;background:var(--accent2);color:#fff;" title="Open Loopに追加">🔄</button>'
+      +   '<button class="btn btn-d btn-sm" onclick="deleteUpcomingEvent('+idx+')" style="font-size:10px;padding:2px 6px;" title="削除">🗑</button>'
       + '</div>'
+      + '</div>'
+      + '<div class="family-card-memo" id="ev-memo-'+idx+'">'
+      +   '<textarea placeholder="メモ（準備状況・気になること等）" oninput="saveFamilyEvMemo('+idx+',this.value)">' + escHtml(ev.userMemo||'') + '</textarea>'
+      +   buildFamilyAIBtns('ev',idx,ev.title,ev.userMemo||'')
       + '</div>';
   }).join('');
 }
@@ -2888,6 +2919,39 @@ function toggleFamilyAction(evIdx, actionIdx, checked){
     afterChange();
     renderUpcoming();
   }
+}
+
+/** UPCOMINGイベントを削除（確認なし・すぐ削除） */
+function deleteUpcomingEvent(idx){
+  var ev = familyEvents[idx];
+  if(!ev) return;
+  if(!confirm('「' + ev.title + '」を削除しますか？')) return;
+  familyEvents.splice(idx, 1);
+  afterChange();
+  renderUpcoming();
+  showBanner('🗑 削除しました');
+}
+
+/** UPCOMINGのイベントをOpen Loopに追加 */
+function addLoopFromEvent(idx){
+  var ev = familyEvents[idx];
+  if(!ev) return;
+  // 既に同じタイトルのループがあれば確認
+  var exists = familyLoops.some(function(l){ return l.title === ev.title; });
+  if(exists){
+    showBanner('⚠️ 同じタイトルのループが既にあります');
+    return;
+  }
+  familyLoops.push({
+    id:      familyUUID(),
+    kind:    'thinking',
+    title:   ev.title,
+    note:    ev.dateStart ? ev.dateStart + (ev.memo ? ' / ' + ev.memo : '') : (ev.memo || ''),
+    created: todayStr()
+  });
+  afterChange();
+  renderFamilyLoops();
+  showBanner('🔄 「' + ev.title + '」をOpen Loopに追加しました');
 }
 
 // ===== OPEN LOOPS =====
@@ -2915,15 +2979,22 @@ function renderFamilyLoops(){
     var idx = familyLoops.indexOf(lp);
     var col = kindColors[lp.kind] || '#888';
     var kindBadge = kindLabels[lp.kind] || lp.kind;
-    return '<div class="loop-item" onclick="openFamilyLoopModal('+idx+')">'
-      + '<div class="loop-kind-dot" style="background:'+col+';"></div>'
-      + '<div style="flex:1;min-width:0;">'
-      +   '<div class="loop-title">' + escHtml(lp.title) + '</div>'
-      +   (lp.note ? '<div class="loop-note">' + escHtml(lp.note) + '</div>' : '')
+    return '<div style="margin-bottom:6px;">'
+      + '<div class="loop-item" style="cursor:default;">'
+      +   '<div class="loop-kind-dot" style="background:'+col+';margin-top:4px;flex-shrink:0;"></div>'
+      +   '<div style="flex:1;min-width:0;" onclick="openFamilyLoopModal('+idx+')" style="cursor:pointer;">'
+      +     '<div class="loop-title">' + escHtml(lp.title) + '</div>'
+      +     (lp.note ? '<div class="loop-note">' + escHtml(lp.note) + '</div>' : '')
+      +   '</div>'
+      +   '<div style="display:flex;flex-direction:column;gap:3px;flex-shrink:0;">'
+      +     '<span class="loop-kind-badge" style="background:'+col+'22;color:'+col+';border:1px solid '+col+'44;">' + kindBadge + '</span>'
+      +     '<button class="btn btn-sm" data-memoid="lp-memo-'+idx+'" onclick="toggleFamilyCardMemo(this.dataset.memoid)" style="font-size:9px;padding:1px 5px;background:var(--surface3);color:var(--text2);">💬 メモ/AI</button>'
+      +   '</div>'
       + '</div>'
-      + '<span class="loop-kind-badge" style="background:'+col+'22;color:'+col+';border:1px solid '+col+'44;">'
-      +   kindBadge
-      + '</span>'
+      + '<div class="family-card-memo" id="lp-memo-'+idx+'">'
+      +   '<textarea placeholder="詳細・考え中のこと" oninput="saveFamilyLpMemo('+idx+',this.value)">' + escHtml(lp.userMemo||'') + '</textarea>'
+      +   buildFamilyAIBtns('lp',idx,lp.title,lp.userMemo||lp.note||'')
+      + '</div>'
       + '</div>';
   }).join('');
 }
@@ -3308,6 +3379,251 @@ function applyScreenshotResult(){
   showBanner('✅ 反映しました: ' + applied.join(' / '));
 }
 
+
+// ===== パスワード認証 =====
+// パスワードはlocalStorageにハッシュ保存。初期値は 'family2024'
+// 変更はダッシュボード設定から（将来対応）
+var DASHBOARD_PW = localStorage.getItem('dashboard_pw') || 'family2024';
+
+function initAuth(){
+  // 既に認証済み（セッション内）
+  if(sessionStorage.getItem('pw_unlocked') === '1'){
+    unlockAllTabs();
+    return;
+  }
+  // Family専用モード記憶
+  if(sessionStorage.getItem('family_only') === '1'){
+    enterFamilyOnly();
+    return;
+  }
+  // パスワードオーバーレイ表示
+  document.getElementById('pw-overlay').style.display = 'flex';
+  // Familyタブをデフォルト表示
+  showTabDirect('family');
+  setTimeout(function(){
+    var el = document.getElementById('pw-input');
+    if(el) el.focus();
+  }, 300);
+}
+
+function checkPassword(){
+  var input = (document.getElementById('pw-input')||{value:''}).value;
+  var stored = localStorage.getItem('dashboard_pw') || 'family2024';
+  if(input === stored){
+    sessionStorage.setItem('pw_unlocked','1');
+    document.getElementById('pw-overlay').style.display = 'none';
+    unlockAllTabs();
+    showTabDirect('overview');
+    showBanner('✅ 認証成功');
+  } else {
+    var err = document.getElementById('pw-error');
+    if(err){ err.textContent = '⚠️ パスワードが違います'; setTimeout(function(){err.textContent='';},2000); }
+    var inp = document.getElementById('pw-input');
+    if(inp){ inp.value=''; inp.focus(); }
+  }
+}
+
+function enterFamilyOnly(){
+  sessionStorage.setItem('family_only','1');
+  document.getElementById('pw-overlay').style.display = 'none';
+  showTabDirect('family');
+}
+
+function unlockAllTabs(){
+  document.body.classList.add('pw-unlocked');
+  document.querySelectorAll('nav button.locked-tab').forEach(function(b){
+    b.classList.remove('locked-tab');
+  });
+}
+
+function showTabDirect(name){
+  // showTab のラッパー（認証状態に関わらず指定タブを表示）
+  var btns = document.querySelectorAll('nav button');
+  var targetBtn = null;
+  btns.forEach(function(b){
+    if(b.getAttribute('onclick') && b.getAttribute('onclick').indexOf("'"+name+"'") >= 0){
+      targetBtn = b;
+    }
+  });
+  if(targetBtn) showTab(name, targetBtn);
+}
+
+/** パスワード変更（設定から呼ぶ） */
+function changeDashboardPassword(){
+  var cur = prompt('現在のパスワードを入力:');
+  var stored = localStorage.getItem('dashboard_pw') || 'family2024';
+  if(cur !== stored){ showBanner('⚠️ 現在のパスワードが違います'); return; }
+  var newpw = prompt('新しいパスワードを入力:');
+  if(!newpw){ return; }
+  var newpw2 = prompt('新しいパスワードを再入力:');
+  if(newpw !== newpw2){ showBanner('⚠️ パスワードが一致しません'); return; }
+  localStorage.setItem('dashboard_pw', newpw);
+  showBanner('✅ パスワードを変更しました');
+}
+
+
+// ===== Google Calendar iCal → UPCOMING自動取得 =====
+// カレンダーID
+var GCAL_CAL_ID = 'bcb55b96a78e5a163783db77444b6fc673179f5d53ddb4ba13ad9f7f8d11ac34@group.calendar.google.com';
+// CORSプロキシ（allorigins.win は無料・安定）
+var GCAL_PROXY  = 'https://api.allorigins.win/get?url=';
+var GCAL_ICAL_URL = 'https://calendar.google.com/calendar/ical/'
+  + encodeURIComponent(GCAL_CAL_ID) + '/public/basic.ics';
+
+/** iCalを取得してUPCOMINGに追加 */
+async function fetchGcalToUpcoming(){
+  var btn = document.getElementById('btn-fetch-gcal');
+  if(btn){ btn.disabled=true; btn.textContent='⏳ 取得中...'; }
+  try{
+    var proxyUrl = GCAL_PROXY + encodeURIComponent(GCAL_ICAL_URL);
+    var res = await fetch(proxyUrl);
+    if(!res.ok) throw new Error('fetch failed: '+res.status);
+    var data = await res.json();
+    var icsText = data.contents;
+    if(!icsText) throw new Error('コンテンツが空です');
+    var events = parseICS(icsText);
+    var added = 0;
+    var today = todayStr();
+    events.forEach(function(ev){
+      if(!ev.dateStart) return;
+      if(ev.dateStart < today) return; // 過去は除外
+      // 既存と重複チェック（同日・同タイトル）
+      var dup = familyEvents.some(function(fe){
+        return fe.title === ev.title && fe.dateStart === ev.dateStart;
+      });
+      if(dup) return;
+      familyEvents.push({
+        id:        familyUUID(),
+        icon:      '📅',
+        title:     ev.title,
+        dateStart: ev.dateStart,
+        dateEnd:   ev.dateEnd || ev.dateStart,
+        actions:   [],
+        memo:      ev.memo || '',
+        source:    'gcal', // Googleカレンダー由来フラグ
+        created:   todayStr()
+      });
+      added++;
+    });
+    if(added > 0){
+      afterChange();
+      renderUpcoming();
+      showBanner('✅ Googleカレンダーから '+added+' 件追加しました');
+    } else {
+      showBanner('ℹ️ 新しいイベントはありませんでした');
+    }
+  } catch(e){
+    console.error('fetchGcalToUpcoming:', e);
+    showBanner('⚠️ 取得失敗: ' + e.message);
+  } finally {
+    if(btn){ btn.disabled=false; btn.textContent='🔄 カレンダー同期'; }
+  }
+}
+
+/** iCalテキストをパース */
+function parseICS(text){
+  var events = [];
+  var lines = text.replace(/\r\n/g,'\n').replace(/\r/g,'\n').split('\n');
+  // 折り返し行を結合
+  var unfolded = [];
+  lines.forEach(function(line){
+    if((line.startsWith(' ')||line.startsWith('\t')) && unfolded.length){
+      unfolded[unfolded.length-1] += line.slice(1);
+    } else {
+      unfolded.push(line);
+    }
+  });
+
+  var ev = null;
+  unfolded.forEach(function(line){
+    if(line === 'BEGIN:VEVENT'){ ev = {}; return; }
+    if(line === 'END:VEVENT'){
+      if(ev) events.push(ev);
+      ev = null; return;
+    }
+    if(!ev) return;
+
+    var colon = line.indexOf(':');
+    if(colon < 0) return;
+    var key = line.slice(0, colon);
+    var val = line.slice(colon+1).trim();
+
+    // iCalエスケープ解除
+    val = val.replace(/\\n/g,'\n').replace(/\\,/g,',').replace(/\\;/g,';').replace(/\\\\/g,'\\');
+
+    if(key === 'SUMMARY')    ev.title = val;
+    if(key === 'DESCRIPTION') ev.memo = val;
+    if(key.startsWith('DTSTART')){ ev.dateStart = icsDateToYMD(val); }
+    if(key.startsWith('DTEND'))  { ev.dateEnd   = icsDateToYMD(val); }
+  });
+  return events;
+}
+
+function icsDateToYMD(val){
+  // 20260518 or 20260518T090000Z
+  var d = val.replace(/T.*$/, '').replace(/-/g,'');
+  if(d.length >= 8){
+    return d.slice(0,4)+'-'+d.slice(4,6)+'-'+d.slice(6,8);
+  }
+  return null;
+}
+
+
+// ===== Familyカード インライン展開 =====
+function toggleFamilyCardMemo(id){
+  var el = document.getElementById(id);
+  if(!el) return;
+  el.classList.toggle('open');
+  if(el.classList.contains('open')){
+    var ta = el.querySelector('textarea');
+    if(ta) ta.focus();
+  }
+}
+function saveFamilyEvMemo(idx, val){
+  if(familyEvents[idx]) familyEvents[idx].userMemo = val;
+  afterChange();
+}
+function saveFamilyLpMemo(idx, val){
+  if(familyLoops[idx]) familyLoops[idx].userMemo = val;
+  afterChange();
+}
+
+/** Familyカード用AIボタン群HTML */
+function buildFamilyAIBtns(type, idx, title, memo){
+  var targets = getAITargets();
+  var tmplOpts = AI_SEND_TEMPLATES.map(function(t){
+    return '<option value="'+t.id+'">'+t.label+'</option>';
+  }).join('');
+  var selectId = 'fai-tmpl-'+type+'-'+idx;
+  var btns = targets.map(function(ai){
+    return '<button class="btn btn-sm"'
+      +' data-ftype="'+type+'" data-fidx="'+idx+'" data-aiid="'+ai.id+'" data-selid="'+selectId+'"'
+      +' onclick="sendFamilyToAI(this.dataset.ftype,this.dataset.fidx,this.dataset.aiid,this.dataset.selid)"'
+      +' style="background:'+ai.color+';color:#fff;font-size:10px;min-height:28px;padding:2px 8px;">'+escAttr(ai.label)+'</button>';
+  }).join('');
+  return '<div class="family-ai-row">'
+    +'<select id="'+selectId+'" style="font-size:10px;padding:2px 4px;min-height:28px;flex:1;min-width:90px;">'+tmplOpts+'</select>'
+    +btns
+    +'</div>';
+}
+
+function sendFamilyToAI(type, idx, aiId, selectId){
+  var item = type==='ev' ? familyEvents[idx] : familyLoops[idx];
+  if(!item) return;
+  var tmplId = (document.getElementById(selectId)||{value:'brainstorm'}).value||'brainstorm';
+  var memo = item.userMemo || (type==='lp' ? item.note : item.memo) || '';
+  var brief = buildAIBrief(item.title, memo, tmplId);
+  var targets = getAITargets();
+  var ai = targets.find(function(t){ return t.id===aiId; })||targets[0];
+  if(!ai) return;
+  copyToClipboard(brief).then(function(){
+    showBanner('📋 コピー済み → '+ai.label+' に貼り付けてください');
+    window.open(ai.url,'_blank');
+  }).catch(function(){
+    showBanner('⚠️ コピー失敗');
+    window.open(ai.url,'_blank');
+  });
+}
 function statusLabel(s){
   var m={before_start:'構想中',before_request:'依頼前',investigate:'調査・探索',design:'設計・検討',review:'FB待ち',research:'実験・研究',wait:'外部待ち',document:'執筆・記録',process:'処理中',rework:'再検討',done:'完了',active:'進行中',risk:'要注意'};
   return m[s]||s;
@@ -5644,6 +5960,8 @@ document.addEventListener('DOMContentLoaded', async function(){
   window.addEventListener('resize', applyMobileClass);
   // GPT APIキー復元
   GPT_API_KEY = getGptApiKey();
+  // 認証初期化（最後に実行）
+  setTimeout(initAuth, 100);
 
   // note編集フラグ
   var noteEl = document.getElementById('now-note');
@@ -6183,6 +6501,30 @@ async function startupSelectFolder(){try{dirHandle=await window.showDirectoryPic
     <div class="modal-footer">
       <button class="btn btn-s" onclick="saveFocusModal()">💾 保存</button>
       <button class="btn btn-g" onclick="closeFocusModal()">キャンセル</button>
+    </div>
+  </div>
+</div>
+
+<!-- パスワード認証オーバーレイ -->
+<div id="pw-overlay" style="display:none;">
+  <div id="pw-box">
+    <div style="font-size:32px;margin-bottom:10px;">🏗️</div>
+    <h2>業務ダッシュボード</h2>
+    <p style="font-size:12px;color:var(--text2);margin-bottom:20px;line-height:1.6;">
+      🏠 Familyタブは誰でも閲覧できます。<br>
+      他のタブを使用するにはパスワードを入力してください。
+    </p>
+    <div style="display:flex;gap:8px;margin-bottom:12px;">
+      <input type="password" id="pw-input" placeholder="パスワード"
+        style="flex:1;font-size:14px;text-align:center;"
+        onkeydown="if(event.key==='Enter')checkPassword()">
+      <button class="btn btn-p" onclick="checkPassword()">Enter</button>
+    </div>
+    <div id="pw-error" style="font-size:11px;color:var(--danger);height:16px;"></div>
+    <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border);">
+      <button class="btn btn-g" onclick="enterFamilyOnly()" style="width:100%;">
+        🏠 パスワードなしでFamilyのみ表示
+      </button>
     </div>
   </div>
 </div>
