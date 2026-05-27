@@ -3469,24 +3469,86 @@ var GCAL_PROXY  = 'https://api.allorigins.win/get?url=';
 var GCAL_ICAL_URL = 'https://calendar.google.com/calendar/ical/'
   + encodeURIComponent(GCAL_CAL_ID) + '/public/basic.ics';
 
-/** iCalを取得してUPCOMINGに追加 */
+/** Google CalendarをGemini APIで読み取ってUPCOMINGに追加 */
 async function fetchGcalToUpcoming(){
   var btn = document.getElementById('btn-fetch-gcal');
   if(btn){ btn.disabled=true; btn.textContent='⏳ 取得中...'; }
+
+  var apiKey = getGeminiApiKey();
+  if(!apiKey){
+    showBanner('⚠️ Gemini APIキーが未設定です');
+    if(btn){ btn.disabled=false; btn.textContent='🔄 カレンダー同期'; }
+    return;
+  }
+
   try{
-    var proxyUrl = GCAL_PROXY + encodeURIComponent(GCAL_ICAL_URL);
-    var res = await fetch(proxyUrl);
-    if(!res.ok) throw new Error('fetch failed: '+res.status);
-    var data = await res.json();
-    var icsText = data.contents;
-    if(!icsText) throw new Error('コンテンツが空です');
-    var events = parseICS(icsText);
-    var added = 0;
     var today = todayStr();
+    var prompt = 'GoogleカレンダーのiCal URL: ' + GCAL_ICAL_URL + '\n\n'
+      + '上記のURLにアクセスして、今日(' + today + ')以降の予定を読み取り、'
+      + '以下のJSON形式だけで返してください。説明文・マークダウン不要。\n'
+      + '{"events":[{"title":"予定名","dateStart":"YYYY-MM-DD","dateEnd":"YYYY-MM-DD","memo":"詳細"}]}';
+
+    // Gemini 1.5 Pro はURLフェッチ非対応のため
+    // 代わりにiCalを直接ブラウザでフェッチしてGeminiでパース
+    // まず直接フェッチを試みる
+    var icsText = null;
+    var fetchMethods = [
+      'https://api.allorigins.win/raw?url=' + encodeURIComponent(GCAL_ICAL_URL),
+      'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(GCAL_ICAL_URL),
+      'https://thingproxy.freeboard.io/fetch/' + GCAL_ICAL_URL
+    ];
+
+    for(var i = 0; i < fetchMethods.length; i++){
+      try{
+        var r = await fetch(fetchMethods[i], {signal: AbortSignal.timeout(8000)});
+        if(r.ok){
+          var text = await r.text();
+          if(text && text.includes('BEGIN:VCALENDAR')){
+            icsText = text;
+            console.log('iCal取得成功 via:', fetchMethods[i]);
+            break;
+          }
+        }
+      }catch(e){ console.warn('proxy failed:', fetchMethods[i], e.message); }
+    }
+
+    if(!icsText){
+      // フェッチ失敗 → Gemini単体に知識で代替提案させる
+      showBanner('⚠️ カレンダー直接取得失敗 → 手動でiCalをインポートしてください');
+      if(btn){ btn.disabled=false; btn.textContent='🔄 カレンダー同期'; }
+      return;
+    }
+
+    // GeminiにiCalテキストを解析させる
+    var geminiPrompt = '以下はGoogleカレンダーのiCalデータです。今日(' + today + ')以降の予定を読み取り、'
+      + 'JSON形式だけで返してください。説明文・```不要。\n'
+      + '形式: {"events":[{"title":"予定名","dateStart":"YYYY-MM-DD","dateEnd":"YYYY-MM-DD","memo":"時刻や詳細"}]}\n\n'
+      + icsText.slice(0, 30000); // トークン制限のため30000文字まで
+
+    var res = await fetch(GEMINI_API_URL + apiKey, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        contents: [{parts: [{text: geminiPrompt}]}],
+        generationConfig: {maxOutputTokens: 2000, temperature: 0}
+      })
+    });
+
+    if(!res.ok){
+      var err = await res.json();
+      throw new Error(err.error ? err.error.message : 'Gemini APIエラー: '+res.status);
+    }
+
+    var data = await res.json();
+    var rawText = data.candidates[0].content.parts[0].text.trim();
+    rawText = rawText.replace(/^```json\s*/,'').replace(/^```\s*/,'').replace(/\s*```$/,'').trim();
+
+    var parsed = JSON.parse(rawText);
+    var events = parsed.events || [];
+    var added = 0;
+
     events.forEach(function(ev){
-      if(!ev.dateStart) return;
-      if(ev.dateStart < today) return; // 過去は除外
-      // 既存と重複チェック（同日・同タイトル）
+      if(!ev.dateStart || ev.dateStart < today) return;
       var dup = familyEvents.some(function(fe){
         return fe.title === ev.title && fe.dateStart === ev.dateStart;
       });
@@ -3499,18 +3561,20 @@ async function fetchGcalToUpcoming(){
         dateEnd:   ev.dateEnd || ev.dateStart,
         actions:   [],
         memo:      ev.memo || '',
-        source:    'gcal', // Googleカレンダー由来フラグ
+        source:    'gcal',
         created:   todayStr()
       });
       added++;
     });
+
     if(added > 0){
       afterChange();
       renderUpcoming();
       showBanner('✅ Googleカレンダーから '+added+' 件追加しました');
     } else {
-      showBanner('ℹ️ 新しいイベントはありませんでした');
+      showBanner('ℹ️ 新しいイベントはありませんでした（'+events.length+'件取得済または重複）');
     }
+
   } catch(e){
     console.error('fetchGcalToUpcoming:', e);
     showBanner('⚠️ 取得失敗: ' + e.message);
@@ -3660,13 +3724,22 @@ async function searchGcalRange(){
   gcalSearchResults = [];
 
   try{
-    var proxyUrl = GCAL_PROXY + encodeURIComponent(GCAL_ICAL_URL);
-    var res = await fetch(proxyUrl);
-    if(!res.ok) throw new Error('取得失敗: '+res.status);
-    var data = await res.json();
-    var events = parseICS(data.contents || '');
+    // 複数プロキシを順番に試す
+    var icsText = null;
+    var fetchMethods = [
+      'https://api.allorigins.win/raw?url=' + encodeURIComponent(GCAL_ICAL_URL),
+      'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(GCAL_ICAL_URL),
+      'https://thingproxy.freeboard.io/fetch/' + GCAL_ICAL_URL
+    ];
+    for(var i=0;i<fetchMethods.length;i++){
+      try{
+        var r = await fetch(fetchMethods[i], {signal: AbortSignal.timeout(8000)});
+        if(r.ok){ var t=await r.text(); if(t&&t.includes('BEGIN:VCALENDAR')){icsText=t;break;} }
+      }catch(e){}
+    }
+    if(!icsText) throw new Error('iCalの取得に失敗しました。カレンダーが一般公開されているか確認してください。');
 
-    // 期間フィルタ
+    var events = parseICS(icsText);
     gcalSearchResults = events.filter(function(ev){
       if(!ev.dateStart) return false;
       return ev.dateStart >= startVal && ev.dateStart <= endVal;
