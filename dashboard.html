@@ -1211,7 +1211,7 @@ body:not(.pw-unlocked) nav button.locked-tab{
       </label>
     </div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">
-      <button class="btn btn-sm" style="background:linear-gradient(135deg,#1565c0,#4285f4);color:#fff;" onclick="searchLocalEventsGemini(false)">✨ Geminiで検索</button>
+      <button class="btn btn-sm" style="background:linear-gradient(135deg,#1565c0,#4285f4);color:#fff;" onclick="searchLocalEventsGemini(false)">🤖 GPTで検索</button>
       <button class="btn btn-sm" style="background:var(--surface3);color:var(--text2);border:1px solid var(--border);font-size:10px;" onclick="saveEvSearchDefaults()">📌 この条件を記憶</button>
     </div>
     <div id="ev-auto-status" style="font-size:10px;color:var(--text3);margin-bottom:6px;"></div>
@@ -3474,9 +3474,9 @@ async function fetchGcalToUpcoming(){
   var btn = document.getElementById('btn-fetch-gcal');
   if(btn){ btn.disabled=true; btn.textContent='⏳ 取得中...'; }
 
-  var apiKey = getGeminiApiKey();
+  var apiKey = getGptApiKey();
   if(!apiKey){
-    showBanner('⚠️ Gemini APIキーが未設定です');
+    showBanner('⚠️ GPT APIキーが未設定です');
     if(btn){ btn.disabled=false; btn.textContent='🔄 カレンダー同期'; }
     return;
   }
@@ -3525,22 +3525,25 @@ async function fetchGcalToUpcoming(){
       + '形式: {"events":[{"title":"予定名","dateStart":"YYYY-MM-DD","dateEnd":"YYYY-MM-DD","memo":"時刻や詳細"}]}\n\n'
       + icsText.slice(0, 30000); // トークン制限のため30000文字まで
 
-    var res = await fetch(GEMINI_API_URL + apiKey, {
+    var gptApiKey = getGptApiKey();
+    if(!gptApiKey) throw new Error('GPT APIキーが未設定です');
+    var res = await fetch(GPT_API_URL, {
       method: 'POST',
-      headers: {'Content-Type':'application/json'},
+      headers: {'Content-Type':'application/json','Authorization':'Bearer '+gptApiKey},
       body: JSON.stringify({
-        contents: [{parts: [{text: geminiPrompt}]}],
-        generationConfig: {maxOutputTokens: 2000, temperature: 0}
+        model: GPT_MODEL,
+        max_tokens: 2000,
+        messages: [{role:'user', content: geminiPrompt}]
       })
     });
 
     if(!res.ok){
       var err = await res.json();
-      throw new Error(err.error ? err.error.message : 'Gemini APIエラー: '+res.status);
+      throw new Error(err.error ? err.error.message : 'GPT APIエラー: '+res.status);
     }
 
     var data = await res.json();
-    var rawText = data.candidates[0].content.parts[0].text.trim();
+    var rawText = data.choices[0].message.content.trim();
     rawText = rawText.replace(/^```json\s*/,'').replace(/^```\s*/,'').replace(/\s*```$/,'').trim();
 
     var parsed = JSON.parse(rawText);
@@ -3866,7 +3869,7 @@ async function checkAutoGeminiSearch(){
     var cachedLabel = localStorage.getItem('gemini_last_search_label');
     if(cached && statusEl){
       var lastDate = new Date(parseInt(lastSearch));
-      statusEl.textContent = '⏱ 前回検索: '+lastDate.getMonth()+1+'/'+lastDate.getDate()+' '+lastDate.getHours()+':'+('0'+lastDate.getMinutes()).slice(-2)+' （次回自動更新まで'+(GEMINI_SEARCH_INTERVAL_HOURS-Math.floor(elapsed))+'時間）';
+      statusEl.textContent = '⏱ GPT検索 前回: '+lastDate.getMonth()+1+'/'+lastDate.getDate()+' '+lastDate.getHours()+':'+('0'+lastDate.getMinutes()).slice(-2)+' （次回更新まで'+(GEMINI_SEARCH_INTERVAL_HOURS-Math.floor(elapsed))+'時間）';
       showEvSearchResult(cachedLabel||'Gemini検索（キャッシュ）', cached);
     }
     return;
@@ -3891,8 +3894,9 @@ async function searchLocalEventsGemini(isAuto){
     return;
   }
 
-  var apiKey = getGeminiApiKey();
-  showEvSearchLoading('Geminiが地域イベントを検索中...');
+  var apiKey = getGptApiKey();
+  if(!apiKey){ showBanner('⚠️ GPT APIキーが未設定です'); return; }
+  showEvSearchLoading('GPTが地域イベントを検索中...');
 
   // 今日の日付を渡す
   var today = new Date();
@@ -3918,22 +3922,23 @@ async function searchLocalEventsGemini(isAuto){
   ].join('\n');
 
   try{
-    var res = await fetch(GEMINI_API_URL + apiKey, {
+    var res = await fetch(GPT_API_URL, {
       method: 'POST',
-      headers: {'Content-Type':'application/json'},
+      headers: {'Content-Type':'application/json','Authorization':'Bearer '+apiKey},
       body: JSON.stringify({
-        contents: [{parts: [{text: prompt}]}],
-        generationConfig: {maxOutputTokens: 2000, temperature: 0.7}
+        model: GPT_MODEL,
+        max_tokens: 2000,
+        messages: [{role:'user', content: prompt}]
       })
     });
 
     if(!res.ok){
       var err = await res.json();
-      throw new Error(err.error ? err.error.message : 'APIエラー: '+res.status);
+      throw new Error(err.error ? err.error.message : 'GPT APIエラー: '+res.status);
     }
 
     var data = await res.json();
-    var text = data.candidates[0].content.parts[0].text.trim();
+    var text = data.choices[0].message.content.trim();
     var label = '✨ Gemini: '+area+(period?' / '+period:'')+'（'+todayJa+'）';
 
     // キャッシュに保存
@@ -3944,7 +3949,7 @@ async function searchLocalEventsGemini(isAuto){
     showEvSearchResult(label, text);
 
     var statusEl = document.getElementById('ev-auto-status');
-    if(statusEl) statusEl.textContent = '✅ 最終更新: '+todayJa+' （24時間ごとに自動更新）';
+    if(statusEl) statusEl.textContent = '✅ GPT検索 最終更新: '+todayJa+' （24時間ごとに自動更新）';
 
   } catch(e){
     showBanner('⚠️ Gemini検索エラー: '+e.message);
