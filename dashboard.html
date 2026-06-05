@@ -563,6 +563,7 @@ body.is-mobile .mobile-only { display: block !important; }
 .focus-dimmed td{opacity:.35;}
 .active-filter{background:var(--accent2) !important;color:#fff !important;}
 @keyframes spin{from{transform:rotate(0deg);}to{transform:rotate(360deg);}}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.6;}}
 /* フォーカス設定モーダル */
 .focus-edit-row{
   display:flex;align-items:center;gap:8px;
@@ -948,6 +949,7 @@ body:not(.pw-unlocked) nav button.locked-tab{
     <h2>インプット一覧</h2>
     <div class="form-row" style="margin-bottom:10px">
       <label>状態<select id="ib-filter" onchange="renderInbox()">
+        <option value="active">📋 未処理のみ（推奨）</option>
         <option value="">全て</option>
         <option value="raw">📥 未整理</option>
         <option value="organized">✅ 整理済</option>
@@ -2254,8 +2256,13 @@ async function dbxRefreshToken(){
   // Implicit Flowはrefresh不可 → 再認証へ
   dbxToken = null;
   localStorage.removeItem('dbx_access_token');
-  showBanner('⚠️ Dropboxトークンが期限切れです。再接続してください');
   applyDropboxUI();
+  // バナーではなくモーダル表示で確実に伝える
+  if(confirm('Dropboxの接続が切れました（4時間で期限切れ）。\n再接続しますか？')){
+    dbxStartAuth();
+  } else {
+    showBanner('⚠️ Dropbox未接続。データはブラウザ内にのみ保存されます');
+  }
   return false;
 }
 
@@ -2375,6 +2382,12 @@ function applyLocalStorageModeUI(){
   } else {
     if(badge) badge.style.display = 'none';
     if(mergeBtn) mergeBtn.style.display = 'none';
+  }
+  // Dropbox未接続時は接続ボタンを目立たせる
+  var btnCon = document.getElementById('btn-dbx-connect');
+  if(btnCon && !dbxConnected()){
+    btnCon.style.display = 'inline-block';
+    btnCon.style.animation = 'pulse 2s infinite';
   }
 }
 
@@ -2562,7 +2575,12 @@ async function loadAll(){
 function afterChange(){
   saveLocalBackup(); // 常にlocalStorageへ
   if(dbxConnected() || dirHandle){
-    saveAll().catch(function(e){ console.error('saveAll error:',e); });
+    saveAll().catch(function(e){
+      console.error('saveAll error:',e);
+      if(e && e.message && (e.message.indexOf('401')>=0 || e.message.indexOf('expired')>=0)){
+        dbxRefreshToken();
+      }
+    });
   }
   // Dropboxもフォルダも未接続の場合はlocalStorageのみ（警告なし）
 }
@@ -2600,6 +2618,12 @@ setInterval(updateClock,1000);updateClock();
 
 // ===== タブ =====
 function showTab(name,btn){
+  // タスクタブ以外に切り替える時はタスクフィルタをリセット
+  if(name !== 'tasks'){
+    var fd=document.getElementById('f-domain'); if(fd) fd.value='';
+    var fm=document.getElementById('f-model'); if(fm) fm.value='';
+    // f-statusはリセットしない（状態フィルタは意図的なことが多い）
+  }
   var tabs=document.querySelectorAll('.tab');
   for(var i=0;i<tabs.length;i++)tabs[i].classList.remove('active');
   var btns=document.querySelectorAll('nav button');
@@ -3004,7 +3028,7 @@ function renderFamilyLoops(){
       +   '<div class="loop-kind-dot" style="background:'+col+';margin-top:4px;flex-shrink:0;"></div>'
       +   '<div style="flex:1;min-width:0;" onclick="openFamilyLoopModal('+idx+')" style="cursor:pointer;">'
       +     '<div class="loop-title">' + escHtml(lp.title) + '</div>'
-      +     (lp.note ? '<div class="loop-note">' + escHtml(lp.note) + '</div>' : '')
+      +     ((lp.userMemo||lp.note) ? '<div class="loop-note">' + escHtml(lp.userMemo||lp.note) + '</div>' : '')
       +   '</div>'
       +   '<div style="display:flex;flex-direction:column;gap:3px;flex-shrink:0;">'
       +     '<span class="loop-kind-badge" style="background:'+col+'22;color:'+col+';border:1px solid '+col+'44;">' + kindBadge + '</span>'
@@ -3012,7 +3036,7 @@ function renderFamilyLoops(){
       +   '</div>'
       + '</div>'
       + '<div class="family-card-memo" id="lp-memo-'+idx+'">'
-      +   '<textarea placeholder="詳細・考え中のこと" oninput="saveFamilyLpMemo('+idx+',this.value)">' + escHtml(lp.userMemo||'') + '</textarea>'
+      +   '<textarea placeholder="詳細・考え中のこと" oninput="saveFamilyLpMemo('+idx+',this.value)">' + escHtml(lp.userMemo||lp.note||'') + '</textarea>'
       +   buildFamilyAIBtns('lp',idx,lp.title,lp.userMemo||lp.note||'')
       + '</div>'
       + '</div>';
@@ -3098,7 +3122,7 @@ function openFamilyLoopModal(idx){
   var lp = (familyLoopEditIdx >= 0) ? familyLoops[familyLoopEditIdx] : null;
   var setVal = function(id, val){ var el=document.getElementById(id); if(el) el.value=val||''; };
   setVal('fl-title', lp ? lp.title : '');
-  setVal('fl-note',  lp ? lp.note : '');
+  setVal('fl-note',  lp ? (lp.userMemo || lp.note || '') : '');
   var kind = lp ? lp.kind : 'thinking';
   var radio = document.querySelector('input[name="fl-kind"][value="'+kind+'"]');
   if(radio) radio.checked = true;
@@ -3121,6 +3145,7 @@ function saveFamilyLoop(){
     kind:    kind,
     title:   title,
     note:    (document.getElementById('fl-note')||{value:''}).value.trim(),
+    userMemo:(document.getElementById('fl-note')||{value:''}).value.trim(),
     created: familyLoopEditIdx >= 0 ? (familyLoops[familyLoopEditIdx].created || todayStr()) : todayStr()
   };
   if(familyLoopEditIdx >= 0) familyLoops[familyLoopEditIdx] = lp;
@@ -3410,6 +3435,13 @@ function applyScreenshotResult(){
 var DASHBOARD_PW = localStorage.getItem('dashboard_pw') || 'family2024';
 
 function initAuth(){
+  // 24時間記憶チェック
+  var rememberUntil = parseInt(localStorage.getItem('pw_remember_until')||'0');
+  if(rememberUntil > Date.now()){
+    sessionStorage.setItem('pw_unlocked','1');
+    unlockAllTabs();
+    return;
+  }
   // 既に認証済み（セッション内）
   if(sessionStorage.getItem('pw_unlocked') === '1'){
     unlockAllTabs();
@@ -3435,6 +3467,11 @@ function checkPassword(){
   var stored = localStorage.getItem('dashboard_pw') || 'family2024';
   if(input === stored){
     sessionStorage.setItem('pw_unlocked','1');
+    // 24時間記憶オプション
+    var remember = document.getElementById('pw-remember');
+    if(remember && remember.checked){
+      localStorage.setItem('pw_remember_until', Date.now() + 86400000);
+    }
     document.getElementById('pw-overlay').style.display = 'none';
     unlockAllTabs();
     showTabDirect('overview');
@@ -3451,6 +3488,12 @@ function enterFamilyOnly(){
   sessionStorage.setItem('family_only','1');
   document.getElementById('pw-overlay').style.display = 'none';
   showTabDirect('family');
+  // Dropbox未接続の場合は接続を促す
+  setTimeout(function(){
+    if(!dbxConnected()){
+      showBanner('📱 データを保存するには「☁️ Dropbox接続」ボタンを押してください');
+    }
+  }, 1500);
 }
 
 function unlockAllTabs(){
@@ -3678,7 +3721,10 @@ function saveFamilyEvMemo(idx, val){
   afterChange();
 }
 function saveFamilyLpMemo(idx, val){
-  if(familyLoops[idx]) familyLoops[idx].userMemo = val;
+  if(familyLoops[idx]){
+    familyLoops[idx].userMemo = val;
+    familyLoops[idx].note = val;
+  }
   afterChange();
 }
 
@@ -4302,7 +4348,10 @@ function renderInbox(){
     var ibStatus = ib.maturity || ib.status || 'raw';
     var ibKind   = ib.kind    || ib.source || 'other';
     var ibDomain = ib.domain  || '';
-    if(filter       && ibStatus !== filter)       continue;
+    // 'active' = 未整理・整理済のみ（AI投入済・タスク化済・アーカイブを除く）
+    if(filter === 'active'){
+      if(ibStatus === 'ai-sent' || ibStatus === 'tasked' || ibStatus === 'archived') continue;
+    } else if(filter && ibStatus !== filter) continue;
     if(filterDomain && ibDomain !== filterDomain) continue;
     if(filterKind   && ibKind   !== filterKind)   continue;
     count++;
@@ -4524,6 +4573,10 @@ function addTask(){
   document.getElementById('t-expectedDate').value='';
   toggleWaitFields('t');
   document.getElementById('t-isRisk').checked=false;
+  var lastModel = document.getElementById('t-model') ? document.getElementById('t-model').value : '';
+  if(lastModel) localStorage.setItem('last_task_model', lastModel);
+  var lastDomain = document.getElementById('t-domain') ? document.getElementById('t-domain').value : '';
+  if(lastDomain) localStorage.setItem('last_task_domain', lastDomain);
   if(document.getElementById('t-domain')) document.getElementById('t-domain').value='';
   renderTasks();showBanner('✅ タスクを追加しました');
 }
@@ -5695,7 +5748,21 @@ function renderProcessIssues(){
   el.innerHTML=html;
 }
 
-function renderAll(){refreshModelSelects();renderOverview();renderLinks();renderAgentLinks();renderQuickLinks();renderFamily();}
+function renderAll(){
+  refreshModelSelects();
+  renderOverview();
+  renderLinks();
+  renderAgentLinks();
+  renderQuickLinks();
+  renderFamily();
+  // 前回のPJ・領域をフォームに復元
+  var lm = localStorage.getItem('last_task_model');
+  var ld = localStorage.getItem('last_task_domain');
+  var mEl = document.getElementById('t-model');
+  var dEl = document.getElementById('t-domain');
+  if(mEl && lm && Array.from(mEl.options).some(function(o){return o.value===lm;})) mEl.value = lm;
+  if(dEl && ld) dEl.value = ld;
+}
 var issueModalType = 'process'; // 'process' or 'project'
 var issueEditType = '';
 var issueEditIdx = -1;
@@ -7102,6 +7169,10 @@ async function startupSelectFolder(){try{dirHandle=await window.showDirectoryPic
       <button class="btn btn-p" onclick="checkPassword()">Enter</button>
     </div>
     <div id="pw-error" style="font-size:11px;color:var(--danger);height:16px;"></div>
+    <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text2);margin-top:8px;cursor:pointer;">
+      <input type="checkbox" id="pw-remember" style="accent-color:var(--accent2);">
+      24時間パスワードを記憶する
+    </label>
     <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border);">
       <button class="btn btn-g" onclick="enterFamilyOnly()" style="width:100%;">
         🏠 パスワードなしでFamilyのみ表示
