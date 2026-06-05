@@ -2928,7 +2928,7 @@ function renderUpcoming(){
       + '</div>'
       + '</div>'
       + '<div class="family-card-memo" id="ev-memo-'+idx+'">'
-      +   '<textarea placeholder="メモ（準備状況・気になること等）" oninput="saveFamilyEvMemo('+idx+',this.value)">' + escHtml(ev.userMemo||'') + '</textarea>'
+      +   '<textarea placeholder="メモ（準備状況・気になること等）" oninput="saveFamilyEvMemo('+idx+',this.value)">' + escHtml(ev.userMemo||ev.memo||'') + '</textarea>'
       +   buildFamilyAIBtns('ev',idx,ev.title,ev.userMemo||'')
       + '</div>';
   }).join('');
@@ -3030,7 +3030,7 @@ function openFamilyEventModal(idx){
   setVal('fe-title',      ev ? ev.title : '');
   setVal('fe-date-start', ev ? ev.dateStart : '');
   setVal('fe-date-end',   ev ? ev.dateEnd : '');
-  setVal('fe-memo',       ev ? ev.memo : '');
+  setVal('fe-memo',       ev ? (ev.userMemo || ev.memo || '') : '');
 
   var delBtn = document.getElementById('fe-delete-btn');
   if(delBtn) delBtn.style.display = (familyEventEditIdx >= 0) ? 'inline-block' : 'none';
@@ -3072,6 +3072,7 @@ function saveFamilyEvent(){
     dateEnd:   getVal('fe-date-end'),
     actions:   familyEventTempActions,
     memo:      getVal('fe-memo'),
+    userMemo:  getVal('fe-memo'),
     created:   familyEventEditIdx >= 0 ? (familyEvents[familyEventEditIdx].created || todayStr()) : todayStr()
   };
   if(familyEventEditIdx >= 0) familyEvents[familyEventEditIdx] = ev;
@@ -3670,7 +3671,10 @@ function toggleFamilyCardMemo(id){
   }
 }
 function saveFamilyEvMemo(idx, val){
-  if(familyEvents[idx]) familyEvents[idx].userMemo = val;
+  if(familyEvents[idx]){
+    familyEvents[idx].userMemo = val;
+    familyEvents[idx].memo = val; // 編集モーダルとも共有
+  }
   afterChange();
 }
 function saveFamilyLpMemo(idx, val){
