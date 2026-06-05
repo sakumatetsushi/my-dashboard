@@ -2018,6 +2018,7 @@ function saveLocalBackup(){
   localStorage.setItem('db3_familyLoops', JSON.stringify(familyLoops));
   localStorage.setItem('db3_familyWeekNotes', JSON.stringify(familyWeekNotes));
   localStorage.setItem('db3_phases', JSON.stringify(phases));
+  localStorage.setItem('db3_dashSettings', JSON.stringify(dashSettings));
 }
 function loadLocalBackup(){
   try{tasks=JSON.parse(localStorage.getItem('db3_tasks')||'[]');}catch(e){tasks=[];}
@@ -2036,6 +2037,16 @@ function loadLocalBackup(){
   try{familyLoops=JSON.parse(localStorage.getItem('db3_familyLoops')||'[]');}catch(e){familyLoops=[];}
   try{familyWeekNotes=JSON.parse(localStorage.getItem('db3_familyWeekNotes')||'{}');}catch(e){familyWeekNotes={};}  
   try{phases=JSON.parse(localStorage.getItem('db3_phases')||'[]');}catch(e){phases=[];}
+  // dashSettings をlocalStorageから復元（ノートURL・クイックリンク等）
+  try{
+    var dsSaved = localStorage.getItem('db3_dashSettings');
+    if(dsSaved){
+      var dsParsed = JSON.parse(dsSaved);
+      if(dsParsed && typeof dsParsed.ownerName === 'string'){
+        dashSettings = Object.assign({}, dashSettings, dsParsed);
+      }
+    }
+  }catch(e){}
   if(!copilotTemplates.length) copilotTemplates = DEFAULT_TEMPLATES.map(function(t){return {title:t.title,body:t.body};});
   try{ processLinks = JSON.parse(localStorage.getItem('db3_processLinks') || '[]'); }catch(e){}
   try{ projectLinks = JSON.parse(localStorage.getItem('db3_projectLinks') || '[]'); }catch(e){}
@@ -2494,6 +2505,7 @@ async function saveAll(){
     await writeFile('copilotTemplates.json', JSON.stringify(copilotTemplates, null, 2));
     await writeFile('aiPromptTemplates.json', JSON.stringify(aiPromptTemplates, null, 2));
     await writeFile('dashSettings.json', JSON.stringify(dashSettings, null, 2));
+    localStorage.setItem('db3_dashSettings', JSON.stringify(dashSettings));
     await writeFile('dailyStates.json', JSON.stringify(dailyStates, null, 2));
     await writeFile('familyEvents.json', JSON.stringify(familyEvents, null, 2));
     await writeFile('familyLoops.json', JSON.stringify(familyLoops, null, 2));
@@ -2555,9 +2567,21 @@ function afterChange(){
   // Dropboxもフォルダも未接続の場合はlocalStorageのみ（警告なし）
 }
 async function manualSave(){
-  if(!dbxConnected() && !dirHandle){ showBanner('⚠️ Dropboxまたはフォルダに接続してください'); return; }
-  await saveAll();
-  showBanner('💾 保存しました');
+  if(!dbxConnected() && !dirHandle){
+    // 未接続でもlocalStorageには保存済み
+    saveLocalBackup();
+    showBanner('💾 ブラウザ内に保存しました（Dropbox未接続）');
+    return;
+  }
+  try{
+    await saveAll();
+    showBanner('✅ Dropboxに保存しました');
+  } catch(e){
+    // 失敗してもlocalStorageには保存済み
+    saveLocalBackup();
+    showBanner('⚠️ Dropbox保存失敗。ブラウザ内には保存済みです');
+    console.error('manualSave error:', e);
+  }
 }
 async function manualLoad(){
   if(!dbxConnected() && !dirHandle){ showBanner('⚠️ Dropboxまたはフォルダに接続してください'); return; }
@@ -6830,7 +6854,12 @@ async function loadDashSettings(){
     }
   }catch(e){}
 }
-async function saveDashSettings(){if(!dirHandle)return;await writeFile('dashSettings.json',JSON.stringify(dashSettings,null,2));}
+async function saveDashSettings(){
+  // Dropbox接続時もローカルフォルダ時も保存
+  await writeFile('dashSettings.json', JSON.stringify(dashSettings, null, 2));
+  // localStorageにもバックアップ
+  localStorage.setItem('db3_dashSettings', JSON.stringify(dashSettings));
+}
 function applyNoteSettings(){
   var u=dashSettings.noteEmbedUrl||'',eu=dashSettings.noteEditUrl||'';
   var ar=document.getElementById('note-embed-area'),el=document.getElementById('note-edit-link');
