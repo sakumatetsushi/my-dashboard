@@ -6655,12 +6655,8 @@ document.addEventListener('DOMContentLoaded', async function(){
 /** Dropbox接続後の初期ロード */
 async function dbxStartupLoad(){
   try{
-    // まずフォルダ構造を確認
-    var folderOk = await dbxCheckFolder();
-    if(!folderOk){
-      // フォルダが存在しない → 作成して空の状態で開始
-      showBanner('📁 connect_jsonフォルダが見つかりません。新規作成します');
-    }
+    // フォルダ構造を確認してDBX_DATA_PATHを自動修正
+    await dbxAutoDetectPath();
     await loadAll();
     await loadDashSettings();
     renderAll();
@@ -6669,7 +6665,7 @@ async function dbxStartupLoad(){
     applyDropboxUI();
     hideStartupOverlay();
     updateFolderStatus('Dropbox接続済み');
-    showBanner('✅ Dropboxからデータを読み込みました');
+    showBanner('✅ Dropboxからデータを読み込みました（パス: '+DBX_DATA_PATH+'）');
   } catch(e){
     console.error('dbxStartupLoad error:', e);
     var refreshed = await dbxRefreshToken();
@@ -6685,30 +6681,45 @@ async function dbxStartupLoad(){
   }
 }
 
-/** Dropboxのフォルダ構造を確認 */
-async function dbxCheckFolder(){
+/** App folderの構造を確認してDBX_DATA_PATHを自動設定 */
+async function dbxAutoDetectPath(){
   try{
     var res = await dbxFetch(DBX_BASE + 'files/list_folder', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
       body: JSON.stringify({path: '', recursive: false})
     });
-    if(!res.ok){ console.warn('DBX list root: status='+res.status); return false; }
+    if(!res.ok){ console.warn('DBX list root: status='+res.status); return; }
     var data = await res.json();
     var entries = data.entries || [];
-    console.log('DBX App folder contents:', entries.map(function(e){ return e.name; }));
-    // connect_jsonフォルダの存在確認
-    var hasFolder = entries.some(function(e){
+    var names = entries.map(function(e){ return e.name + '(' + e['.tag'] + ')'; });
+    console.log('DBX App folder contents:', names);
+
+    // connect_json フォルダが存在するか確認
+    var hasConnectJson = entries.some(function(e){
       return e.name === 'connect_json' && e['.tag'] === 'folder';
     });
-    if(!hasFolder){
-      console.warn('DBX: connect_json folder not found. Available:', entries.map(function(e){ return e.name+' ('+e['.tag']+')'; }));
-      showBanner('⚠️ Dropboxに connect_json フォルダが見つかりません（コンソールで詳細確認）');
+    // JSONファイルがルート直下にあるか確認
+    var hasRootJson = entries.some(function(e){
+      return e.name === 'tasks.json' && e['.tag'] === 'file';
+    });
+
+    if(hasConnectJson){
+      DBX_DATA_PATH = '/connect_json/';
+      console.log('DBX_DATA_PATH 自動設定: /connect_json/');
+    } else if(hasRootJson){
+      DBX_DATA_PATH = '/';
+      console.log('DBX_DATA_PATH 自動設定: / (ルート直下)');
+    } else {
+      // どちらも見つからない場合 → connect_jsonをデフォルトに
+      DBX_DATA_PATH = '/connect_json/';
+      console.warn('DBX: JSONファイルが見つかりません。connect_jsonフォルダに保存します');
+      showBanner('⚠️ Dropboxにデータなし。新規作成します');
     }
-    return hasFolder;
+    // fs-statusに現在のパスを表示
+    updateFolderStatus('Dropbox(' + DBX_DATA_PATH + ')');
   }catch(e){
-    console.error('DBX checkFolder:', e);
-    return false;
+    console.error('dbxAutoDetectPath:', e);
   }
 }
 
